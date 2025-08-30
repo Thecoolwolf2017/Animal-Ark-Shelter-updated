@@ -1,9 +1,8 @@
-using System;
 using GTA;
-using GTA.Native;
 using GTA.Math;
-using LemonUI;
+using GTA.Native;
 using LemonUI.Menus;
+using System;
 
 namespace AnimalArkShelter
 {
@@ -12,12 +11,10 @@ namespace AnimalArkShelter
         public static NativeMenu ShopMenu;
         public static Ped ShowcaseAnimal;
 
-        // Use native camera to avoid API signature mismatches across nightlies
+        // Native camera (robust across SHVDN3 nightlies)
         private static int _shopCam = 0;
 
         private static NativeItem _suppliesItem;
-        private static NativeSeparatorItem _supSep;
-        private static bool _supInserted = false;
 
         private class AnimalDef
         {
@@ -42,7 +39,7 @@ namespace AnimalArkShelter
         public BuyPetMenu()
         {
             Tick += OnTick;
-            Aborted += (s,e) => CleanupCamera();
+            Aborted += (s, e) => CleanupCamera();
         }
 
         public static void EnsureMenu()
@@ -52,12 +49,7 @@ namespace AnimalArkShelter
             ShopMenu = new NativeMenu("ANIMAL ARK", "Pet Store", "");
             Main.UiPool.Add(ShopMenu);
 
-            _suppliesItem = new NativeItem("Supplies...", "Buy items for your pet");
-            _supSep = new NativeSeparatorItem();
-
-            // Initially we do not insert supplies until player has a pet (prevents blank gap)
-            InsertOrRemoveSuppliesItem(forceInsert:false);
-
+            // Add animals first
             for (int i = 0; i < Animals.Length; i++)
             {
                 var a = Animals[i];
@@ -65,17 +57,23 @@ namespace AnimalArkShelter
                 ShopMenu.Add(it);
             }
 
+            // Supplies at the end (no separator to avoid visual gap); enable only if player has a pet
+            _suppliesItem = new NativeItem("Supplies...", "Buy items for your pet");
+            _suppliesItem.Enabled = Main.HasPet;
+            ShopMenu.Add(_suppliesItem);
+
             ShopMenu.ItemActivated += (s, e) =>
             {
                 if (e.Item == _suppliesItem)
                 {
-                    // Open supplies as a separate menu to avoid overlap
-                    ShopMenu.Visible = false;
+                    if (!Main.HasPet) { Utils.Notify("~o~You need a pet first."); return; }
+                    ShopMenu.Visible = false; // prevent overlap
                     try { BuyPetStuffMenu.Init(); } catch { }
                     return;
                 }
 
-                int idx = ShopMenu.SelectedIndex - (_supInserted ? 2 : 0);
+                // Animal adoption
+                int idx = ShopMenu.SelectedIndex;
                 if (idx >= 0 && idx < Animals.Length)
                 {
                     AdoptFromShowcase(idx);
@@ -112,7 +110,7 @@ namespace AnimalArkShelter
             ShowcaseAnimal = null;
         }
 
-        public static void ClearHealthBar() { try { Hud.Hide(); } catch {} }
+        public static void ClearHealthBar() { try { Hud.Hide(); } catch { } }
 
         private static void CleanupCamera()
         {
@@ -131,16 +129,16 @@ namespace AnimalArkShelter
         private static int _lastIndexShown = -1;
 
         private static Vector3 ShowcasePos => Main._shopPos + Utils.ShowcaseOffset;
-        private static Vector3 CameraPos   => Main._shopPos + Utils.CameraOffset;
+        private static Vector3 CameraPos => Main._shopPos + Utils.CameraOffset;
 
         private void OnTick(object sender, EventArgs e)
         {
-            // Insert/remove supplies entry dynamically to avoid a permanent blank separator
-            InsertOrRemoveSuppliesItem();
+            // Keep supplies enabled state synced; no “gap” items used
+            if (_suppliesItem != null) _suppliesItem.Enabled = Main.HasPet;
 
             if (ShopMenu != null && ShopMenu.Visible)
             {
-                int idx = ShopMenu.SelectedIndex - (_supInserted ? 2 : 0);
+                int idx = ShopMenu.SelectedIndex;
                 if (idx != _lastIndexShown && idx >= 0 && idx < Animals.Length)
                 {
                     SpawnOrSwapShowcase(Animals[idx].Model);
@@ -150,24 +148,6 @@ namespace AnimalArkShelter
             else
             {
                 if (_shopCam != 0) CleanupCamera();
-            }
-        }
-
-        private static void InsertOrRemoveSuppliesItem(bool forceInsert = false)
-        {
-            bool shouldHave = forceInsert || Main.HasPet;
-            if (shouldHave && !_supInserted)
-            {
-                ShopMenu.Add(_suppliesItem, 0);
-                ShopMenu.Add(_supSep, 1);
-                _supInserted = true;
-            }
-            else if (!shouldHave && _supInserted)
-            {
-                // Remove both to avoid a “gap”
-                try { ShopMenu.Remove(_suppliesItem); } catch {}
-                try { ShopMenu.Remove(_supSep); } catch {}
-                _supInserted = false;
             }
         }
 
@@ -231,7 +211,7 @@ namespace AnimalArkShelter
             }
             if (ShowcaseAnimal == null || !ShowcaseAnimal.Exists()) return;
 
-            // Rename/convert the showcase ped into the adopted pet (prevents duplication)
+            // Convert showcase ped into the adopted pet (prevents duplication)
             Main.Pet = ShowcaseAnimal;
             ShowcaseAnimal = null;
 
@@ -263,12 +243,11 @@ namespace AnimalArkShelter
             }
             catch { }
 
-            // Small "walk-off-screen" beat, then spawn by player
+            // Optional showcase walk-off beat
             try
             {
-                if (Utils.EnableWalkOffAnim)
+                if (Utils.EnableWalkOffAnim && _shopCam != 0)
                 {
-                    var forward = Function.Call<Vector3>(Hash.GET_CAM_ROT, _shopCam, 2);
                     var ahead = ShowcasePos + Game.Player.Character.ForwardVector * Utils.WalkOffDistance;
                     Function.Call(Hash.TASK_GO_STRAIGHT_TO_COORD, Main.Pet.Handle, ahead.X, ahead.Y, ahead.Z, 1.2f, 2500, 0f, 0f);
                     Script.Wait(350);

@@ -1,8 +1,6 @@
-using System;
 using GTA;
-using GTA.Native;
 using GTA.Math;
-using LemonUI;
+using GTA.Native;
 using LemonUI.Menus;
 
 namespace AnimalArkShelter
@@ -11,9 +9,9 @@ namespace AnimalArkShelter
     {
         public static NativeMenu InteractionMenu;
 
-        // Track "posed in vehicle" state so we can detach cleanly
+        // Track in-vehicle pose state
         private static bool _vehPoseActive = false;
-        private static int  _vehPoseVehHandle = 0;
+        private static int _vehPoseVehHandle = 0;
         private static VehicleSeat _vehPoseSeat = VehicleSeat.Passenger;
 
         public PetInteractionMenu() { }
@@ -24,15 +22,15 @@ namespace AnimalArkShelter
 
             InteractionMenu = new NativeMenu("", "PET INTERACTION", "");
 
-            var follow    = new NativeItem("Follow", "Have your pet follow you");
-            var stay      = new NativeItem("Stay", "Tell your pet to stay here");
-            var come      = new NativeItem("Come Here", "Call your pet to your position");
-            var sit       = new NativeItem("Sit", "Make your pet sit");
-            var lie       = new NativeItem("Lay Down", "Make your pet lay down");
-            var enterVeh  = new NativeItem("Enter Vehicle", "Put your pet into your vehicle");
-            var exitVeh   = new NativeItem("Exit Vehicle", "Have your pet exit the vehicle");
-            var heal      = new NativeItem("Treat (+10 HP)", "Feed a quick treat");
-            var dismiss   = new NativeItem("Dismiss Pet", "Send your pet home");
+            var follow = new NativeItem("Follow", "Have your pet follow you");
+            var stay = new NativeItem("Stay", "Tell your pet to stay here");
+            var come = new NativeItem("Come Here", "Call your pet to your position");
+            var sit = new NativeItem("Sit", "Make your pet sit");
+            var lie = new NativeItem("Lay Down", "Make your pet lay down");
+            var enterVeh = new NativeItem("Enter Vehicle", "Put your pet into your vehicle");
+            var exitVeh = new NativeItem("Exit Vehicle", "Have your pet exit the vehicle");
+            var heal = new NativeItem("Treat (+10 HP)", "Feed a quick treat");
+            var dismiss = new NativeItem("Dismiss Pet", "Send your pet home");
 
             InteractionMenu.Add(follow);
             InteractionMenu.Add(stay);
@@ -49,15 +47,15 @@ namespace AnimalArkShelter
                 var item = e.Item;
                 if (Main.Pet == null || !Main.Pet.Exists()) return;
 
-                if (item == follow)        DoFollow();
-                else if (item == stay)     DoStay();
-                else if (item == come)     DoComeHere();
-                else if (item == sit)      DoSit();
-                else if (item == lie)      DoLay();
+                if (item == follow) DoFollow();
+                else if (item == stay) DoStay();
+                else if (item == come) DoComeHere();
+                else if (item == sit) DoSit();
+                else if (item == lie) DoLay();
                 else if (item == enterVeh) DoEnterVehicle();
-                else if (item == exitVeh)  DoExitVehicle();
-                else if (item == heal)     DoHeal();
-                else if (item == dismiss)  DoDismiss();
+                else if (item == exitVeh) DoExitVehicle();
+                else if (item == heal) DoHeal();
+                else if (item == dismiss) DoDismiss();
             };
         }
 
@@ -65,6 +63,11 @@ namespace AnimalArkShelter
         {
             if (InteractionMenu == null) EnsureMenu();
             InteractionMenu.Visible = !InteractionMenu.Visible;
+        }
+
+        public static void Hide()
+        {
+            if (InteractionMenu != null) InteractionMenu.Visible = false;
         }
 
         private static void DoFollow()
@@ -98,7 +101,6 @@ namespace AnimalArkShelter
                 var me = Game.Player.Character;
                 float dist = me.Position.DistanceTo(Main.Pet.Position);
 
-                // Prefer natural pathing—teleport only if extremely far or stuck too long
                 if (Utils.ComeWarpIfFar && dist > Utils.ComeWarpDistance)
                 {
                     Main.Pet.Position = me.Position + me.ForwardVector * -1.0f;
@@ -128,18 +130,6 @@ namespace AnimalArkShelter
             return false;
         }
 
-        private static bool IsPlayingScenarioOrAnim(Ped p)
-        {
-            try
-            {
-                if (p == null || !p.Exists()) return false;
-                if (Function.Call<bool>(Hash.IS_PED_ACTIVE_IN_SCENARIO, p.Handle)) return true;
-                if (Function.Call<bool>(Hash.IS_PED_USING_ANY_SCENARIO, p.Handle)) return true;
-            }
-            catch {}
-            return false;
-        }
-
         private static void PlayAnim(Ped p, string dict, string name, int flags = 1, int duration = -1)
         {
             try
@@ -162,9 +152,7 @@ namespace AnimalArkShelter
 
             try
             {
-                string model = Function.Call<string>(Hash.GET_ENTITY_MODEL, Main.Pet.Handle).ToString();
-                // Dogs: use scenario SIT or sit anims; Cats: use grooming as a "sit-in-place"
-                if (Function.Call<bool>(Hash.IS_THIS_MODEL_A_DOG, Main.Pet.Model.Hash))
+                if (Utils.IsDogModel(Main.Pet.Model))
                 {
                     Function.Call(Hash.TASK_START_SCENARIO_IN_PLACE, Main.Pet.Handle, "WORLD_DOG_SITTING", 0, true);
                 }
@@ -188,7 +176,7 @@ namespace AnimalArkShelter
 
             try
             {
-                if (Function.Call<bool>(Hash.IS_THIS_MODEL_A_DOG, Main.Pet.Model.Hash))
+                if (Utils.IsDogModel(Main.Pet.Model))
                 {
                     PlayAnim(Main.Pet, "creatures@rottweiler@amb@sleep_in_kennel@", "sleep_in_kennel", 1, -1);
                 }
@@ -216,10 +204,9 @@ namespace AnimalArkShelter
                 VehicleSeat seat = VehicleSeat.Any;
                 try { seat = (VehicleSeat)Utils.VehicleSeatIndex; } catch { }
 
-                // Task enter vehicle
                 Function.Call(Hash.TASK_ENTER_VEHICLE, Main.Pet.Handle, veh.Handle, -1, (int)seat, 1.2f, 1, 0);
 
-                // Auto-pose: once in, play a sit/lay loop depending on config
+                // Auto-pose once in
                 Script.Wait(800);
                 if (IsInAnyVehicle(Main.Pet))
                 {
@@ -227,14 +214,8 @@ namespace AnimalArkShelter
                     _vehPoseVehHandle = veh.Handle;
                     _vehPoseSeat = seat;
 
-                    if (Utils.VehiclePose == 0) // sit
-                    {
-                        PlayAnim(Main.Pet, "creatures@rottweiler@incar@std@ds@", "sit", 1, -1);
-                    }
-                    else // lay
-                    {
-                        PlayAnim(Main.Pet, "creatures@rottweiler@incar@std@ds@", "sleep", 1, -1);
-                    }
+                    if (Utils.VehiclePose == 0) PlayAnim(Main.Pet, "creatures@rottweiler@incar@std@ds@", "sit", 1, -1);
+                    else /* lay */                    PlayAnim(Main.Pet, "creatures@rottweiler@incar@std@ds@", "sleep", 1, -1);
                 }
             }
             catch { }
@@ -249,8 +230,9 @@ namespace AnimalArkShelter
                 Function.Call(Hash.TASK_LEAVE_ANY_VEHICLE, Main.Pet.Handle, 0, 0);
                 Script.Wait(600);
 
-                // Clear pose state and nudge to the side
                 _vehPoseActive = false; _vehPoseVehHandle = 0;
+
+                // Nudge beside vehicle
                 var veh = Game.Player.Character.CurrentVehicle;
                 if (veh != null && veh.Exists())
                 {
@@ -284,7 +266,7 @@ namespace AnimalArkShelter
             try
             {
                 if (pet == null || !pet.Exists()) return;
-                if (IsInAnyVehicle(pet)) DoExitVehicle();
+                if (Function.Call<bool>(Hash.IS_PED_IN_ANY_VEHICLE, pet.Handle, false)) DoExitVehicle();
 
                 if (Main.PetBlip != null && Main.PetBlip.Exists()) { Main.PetBlip.Delete(); Main.PetBlip = null; }
                 Function.Call(Hash.CLEAR_PED_TASKS_IMMEDIATELY, pet.Handle);

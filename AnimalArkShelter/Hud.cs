@@ -1,5 +1,4 @@
 using GTA.Native;
-using GTA.Math;
 
 namespace AnimalArkShelter
 {
@@ -24,6 +23,21 @@ namespace AnimalArkShelter
             _pct = pct;
         }
 
+        // Overload to match older calls (name + percent + show flag)
+        public static void Update(string petName, float pct, bool show)
+        {
+            if (show) Show(petName);
+            Update(pct);
+        }
+
+        // Overload to accept raw health and max (common in some forks)
+        public static void Update(string petName, int health, int maxHealth)
+        {
+            float pct = (maxHealth > 0) ? (float)health / (float)maxHealth : 0f;
+            Show(petName);
+            Update(pct);
+        }
+
         public static void Draw()
         {
             if (!_visible) return;
@@ -33,16 +47,13 @@ namespace AnimalArkShelter
             float w = 0.22f;
             float h = 0.035f;
 
-            // Background
             Function.Call(Hash.DRAW_RECT, cx, cy, w, h, 0, 0, 0, Utils.HudBackAlpha);
 
-            // Fill
             float left = cx - w * 0.5f;
             float fillW = w * _pct;
             float fillX = left + fillW * 0.5f;
             Function.Call(Hash.DRAW_RECT, fillX, cy, fillW, h * 0.65f, 255, 255, 255, Utils.HudFillAlpha);
 
-            // Text (outlined by Utils settings)
             Utils.DrawText(_label, cx - w * 0.48f, cy - h * 0.55f, Utils.HudScale, Utils.HudTextR, Utils.HudTextG, Utils.HudTextB, Utils.HudTextA);
         }
     }
