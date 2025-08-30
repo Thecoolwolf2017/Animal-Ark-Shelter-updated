@@ -1,0 +1,12 @@
+C:\Users\hunte\Desktop\gta dev\AnimalArkShelter\AnimalArkShelter\bin\x64\Debug\AnimalArkShelter.dll
+C:\Users\hunte\Desktop\gta dev\AnimalArkShelter\AnimalArkShelter\bin\x64\Debug\AnimalArkShelter.pdb
+C:\Users\hunte\Desktop\gta dev\AnimalArkShelter\AnimalArkShelter\bin\x64\Debug\LemonUI.SHVDN3.dll
+C:\Users\hunte\Desktop\gta dev\AnimalArkShelter\AnimalArkShelter\bin\x64\Debug\ScriptHookVDotNet3.dll
+C:\Users\hunte\Desktop\gta dev\AnimalArkShelter\AnimalArkShelter\bin\x64\Debug\LemonUI.SHVDN3.pdb
+C:\Users\hunte\Desktop\gta dev\AnimalArkShelter\AnimalArkShelter\bin\x64\Debug\LemonUI.SHVDN3.xml
+C:\Users\hunte\Desktop\gta dev\AnimalArkShelter\AnimalArkShelter\bin\x64\Debug\ScriptHookVDotNet3.pdb
+C:\Users\hunte\Desktop\gta dev\AnimalArkShelter\AnimalArkShelter\obj\x64\Debug\AnimalArkShelter.csproj.AssemblyReference.cache
+C:\Users\hunte\Desktop\gta dev\AnimalArkShelter\AnimalArkShelter\obj\x64\Debug\AnimalArkShelter.csproj.CoreCompileInputs.cache
+C:\Users\hunte\Desktop\gta dev\AnimalArkShelter\AnimalArkShelter\obj\x64\Debug\AnimalAr.023F69A4.Up2Date
+C:\Users\hunte\Desktop\gta dev\AnimalArkShelter\AnimalArkShelter\obj\x64\Debug\AnimalArkShelter.dll
+C:\Users\hunte\Desktop\gta dev\AnimalArkShelter\AnimalArkShelter\obj\x64\Debug\AnimalArkShelter.pdb
