@@ -54,7 +54,8 @@ namespace AnimalArkShelter
             float fillX = left + fillW * 0.5f;
             Function.Call(Hash.DRAW_RECT, fillX, cy, fillW, h * 0.65f, 255, 255, 255, Utils.HudFillAlpha);
 
-            Utils.DrawText(_label, cx - w * 0.48f, cy - h * 0.55f, Utils.HudScale, Utils.HudTextR, Utils.HudTextG, Utils.HudTextB, Utils.HudTextA);
+            // Center the label horizontally over the bar
+            Utils.DrawText(_label, cx, cy - h * 0.55f, Utils.HudScale, Utils.HudTextR, Utils.HudTextG, Utils.HudTextB, Utils.HudTextA, true);
         }
     }
 }

@@ -10,31 +10,31 @@ namespace AnimalArkShelter
     {
         public static NativeMenu ShopMenu;
         public static Ped ShowcaseAnimal;
+        public static Ped Shopkeeper;
 
         // Native camera (robust across SHVDN3 nightlies)
         private static int _shopCam = 0;
 
         private static NativeItem _suppliesItem;
 
-        private class AnimalDef
+        private class AnimalDef(string name, string model, int price)
         {
-            public string Name;
-            public string Model;
-            public int Price;
-            public AnimalDef(string name, string model, int price) { Name = name; Model = model; Price = price; }
+            public string Name = name;
+            public string Model = model;
+            public int Price = price;
         }
 
-        private static readonly AnimalDef[] Animals = new AnimalDef[]
-        {
-            new AnimalDef("Cat",        "a_c_cat_01",     500),
-            new AnimalDef("Husky",      "a_c_husky",      1200),
-            new AnimalDef("Westy",      "a_c_westy",      800),
-            new AnimalDef("Poodle",     "a_c_poodle",     900),
-            new AnimalDef("Rottweiler", "a_c_rottweiler", 1100),
-            new AnimalDef("Retriever",  "a_c_retriever",  1100),
-            new AnimalDef("Pug",        "a_c_pug",        850),
-            new AnimalDef("Chop",       "a_c_chop",       1500),
-        };
+        private static readonly AnimalDef[] Animals =
+        [
+            new("Cat",        "a_c_cat_01",     500),
+            new("Husky",      "a_c_husky",      1200),
+            new("Westy",      "a_c_westy",      800),
+            new("Poodle",     "a_c_poodle",     900),
+            new("Rottweiler", "a_c_rottweiler", 1100),
+            new("Retriever",  "a_c_retriever",  1100),
+            new("Pug",        "a_c_pug",        850),
+            new("Chop",       "a_c_chop",       1500),
+        ];
 
         public BuyPetMenu()
         {
@@ -58,8 +58,10 @@ namespace AnimalArkShelter
             }
 
             // Supplies at the end (no separator to avoid visual gap); enable only if player has a pet
-            _suppliesItem = new NativeItem("Supplies...", "Buy items for your pet");
-            _suppliesItem.Enabled = Main.HasPet;
+            _suppliesItem = new NativeItem("Supplies...", "Buy items for your pet")
+            {
+                Enabled = Main.HasPet
+            };
             ShopMenu.Add(_suppliesItem);
 
             ShopMenu.ItemActivated += (s, e) =>
@@ -92,6 +94,8 @@ namespace AnimalArkShelter
                 _lastIndexShown = 0;
             }
 
+            EnsureShopkeeper();
+
             SetupShopCamera();
             ShopMenu.Visible = true;
         }
@@ -108,6 +112,17 @@ namespace AnimalArkShelter
             }
             catch { }
             ShowcaseAnimal = null;
+
+            try
+            {
+                if (Shopkeeper != null && Shopkeeper.Exists())
+                {
+                    Shopkeeper.MarkAsNoLongerNeeded();
+                    Shopkeeper.Delete();
+                }
+            }
+            catch { }
+            Shopkeeper = null;
         }
 
         public static void ClearHealthBar() { try { Hud.Hide(); } catch { } }
@@ -128,6 +143,7 @@ namespace AnimalArkShelter
 
         private static int _lastIndexShown = -1;
 
+        // Fixed world offsets from the shop anchor (not player-facing)
         private static Vector3 ShowcasePos => Main._shopPos + Utils.ShowcaseOffset;
         private static Vector3 CameraPos => Main._shopPos + Utils.CameraOffset;
 
@@ -144,6 +160,8 @@ namespace AnimalArkShelter
                     SpawnOrSwapShowcase(Animals[idx].Model);
                     _lastIndexShown = idx;
                 }
+
+                if (Shopkeeper == null || !Shopkeeper.Exists()) EnsureShopkeeper();
             }
             else
             {
@@ -160,10 +178,15 @@ namespace AnimalArkShelter
                 _shopCam = Function.Call<int>(Hash.CREATE_CAM, "DEFAULT_SCRIPTED_CAMERA", true);
                 if (_shopCam != 0 && Function.Call<bool>(Hash.DOES_CAM_EXIST, _shopCam))
                 {
-                    Function.Call(Hash.SET_CAM_COORD, _shopCam, CameraPos.X, CameraPos.Y, CameraPos.Z);
+                    // Keep camera safely above ground
+                    var camPos = CameraPos;
+                    try { if (Utils.TryGetGroundZ(camPos, out var gz) && camPos.Z < gz + 0.6f) camPos = new Vector3(camPos.X, camPos.Y, gz + 0.6f); } catch { }
+                    Function.Call(Hash.SET_CAM_COORD, _shopCam, camPos.X, camPos.Y, camPos.Z);
                     Function.Call(Hash.SET_CAM_ROT, _shopCam, 0.0f, 0.0f, 0.0f, 2);
                     Function.Call(Hash.SET_CAM_FOV, _shopCam, Utils.ShopFov);
-                    Function.Call(Hash.POINT_CAM_AT_COORD, _shopCam, ShowcasePos.X, ShowcasePos.Y, ShowcasePos.Z);
+                    // Aim at the actual ped if available, otherwise fallback; slight Z lift for framing
+                    var look = (ShowcaseAnimal != null && ShowcaseAnimal.Exists()) ? ShowcaseAnimal.Position : ShowcasePos;
+                    Function.Call(Hash.POINT_CAM_AT_COORD, _shopCam, look.X, look.Y, look.Z + 0.3f);
                     Function.Call(Hash.SET_CAM_ACTIVE, _shopCam, true);
                     Function.Call(Hash.RENDER_SCRIPT_CAMS, true, true, Utils.ShopEaseTimeMs, true, false, 0);
                 }
@@ -194,12 +217,48 @@ namespace AnimalArkShelter
             ShowcaseAnimal = World.CreatePed(model, pos);
             if (ShowcaseAnimal != null && ShowcaseAnimal.Exists())
             {
-                ShowcaseAnimal.Heading = Game.Player.Character.Heading + 180f;
+                // Face the camera direction
+                var toCam = CameraPos - ShowcaseAnimal.Position; toCam.Z = 0f;
+                if (toCam.Length() > 0.001f)
+                {
+                    float heading = (float)(System.Math.Atan2(toCam.Y, toCam.X) * 180.0 / System.Math.PI);
+                    ShowcaseAnimal.Heading = heading;
+                }
                 ShowcaseAnimal.IsPersistent = true;
                 Function.Call(Hash.SET_PED_CAN_BE_TARGETTED, ShowcaseAnimal.Handle, false);
                 Function.Call(Hash.SET_PED_CAN_RAGDOLL, ShowcaseAnimal.Handle, false);
                 Function.Call(Hash.TASK_STAND_STILL, ShowcaseAnimal.Handle, -1);
             }
+        }
+
+        private static void EnsureShopkeeper()
+        {
+            try
+            {
+                if (Shopkeeper != null && Shopkeeper.Exists()) return;
+                var model = new Model(Utils.ShopkeeperModel);
+                model.Request(500);
+                if (!model.IsInCdImage || !model.IsValid) return;
+
+                var pos = Main._shopPos + Utils.ShopkeeperOffset;
+                if (Utils.TryGetGroundZ(pos, out var gz) && gz > 0f) pos = new Vector3(pos.X, pos.Y, gz + 0.05f);
+
+                Shopkeeper = World.CreatePed(model, pos);
+                if (Shopkeeper != null && Shopkeeper.Exists())
+                {
+                    var look = (ShowcaseAnimal != null && ShowcaseAnimal.Exists()) ? ShowcaseAnimal.Position : ShowcasePos;
+                    var dir = look - Shopkeeper.Position; dir.Z = 0f;
+                    if (dir.Length() > 0.001f)
+                    {
+                        float heading = (float)(System.Math.Atan2(dir.Y, dir.X) * 180.0 / System.Math.PI);
+                        Shopkeeper.Heading = heading;
+                    }
+                    Shopkeeper.IsPersistent = true;
+                    Function.Call(Hash.SET_BLOCKING_OF_NON_TEMPORARY_EVENTS, Shopkeeper.Handle, true);
+                    Function.Call(Hash.TASK_START_SCENARIO_IN_PLACE, Shopkeeper.Handle, "WORLD_HUMAN_STAND_IMPATIENT", 0, true);
+                }
+            }
+            catch { }
         }
 
         private static void AdoptFromShowcase(int index)

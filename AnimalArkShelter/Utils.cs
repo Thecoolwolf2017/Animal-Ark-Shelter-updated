@@ -6,11 +6,15 @@ using System.Collections.Generic;
 
 namespace AnimalArkShelter
 {
-    public static class Utils
+    public static partial class Utils
     {
-        // Dog/Cat model hash sets (filled at runtime)
-        private static readonly HashSet<uint> DogModels = new HashSet<uint>();
-        private static readonly HashSet<uint> CatModels = new HashSet<uint>();
+        // Dog/Cat model hash sets (filled at type init via helper)
+        private static readonly HashSet<uint> DogModels = [.. GetModelHashes(
+            "a_c_rottweiler", "a_c_husky", "a_c_westy", "a_c_retriever", "a_c_poodle", "a_c_pug", "a_c_chop"
+        )];
+        private static readonly HashSet<uint> CatModels = [.. GetModelHashes(
+            "a_c_cat_01"
+        )];
 
         // --- INI-backed config (loaded once) ---
         static Utils()
@@ -28,6 +32,13 @@ namespace AnimalArkShelter
                 float showY = ini.GetValue("Shop", "ShowcaseOffsetY", 1.2f);
                 float showZ = ini.GetValue("Shop", "ShowcaseOffsetZ", 0.0f);
                 ShowcaseOffset = new Vector3(showX, showY, showZ);
+
+                // Optional shopkeeper at the counter
+                float skX = ini.GetValue("Shop", "ShopkeeperOffsetX", -0.8f);
+                float skY = ini.GetValue("Shop", "ShopkeeperOffsetY", -0.5f);
+                float skZ = ini.GetValue("Shop", "ShopkeeperOffsetZ", 0.0f);
+                ShopkeeperOffset = new Vector3(skX, skY, skZ);
+                ShopkeeperModel = ini.GetValue("Shop", "ShopkeeperModel", "s_f_y_shop_low");
 
                 ShopFov = ini.GetValue("Shop", "FOV", 50.0f);
                 ShopEaseTimeMs = ini.GetValue("Shop", "EaseTimeMs", 350);
@@ -57,15 +68,7 @@ namespace AnimalArkShelter
             }
             catch { }
 
-            // Build hash sets
-            try
-            {
-                string[] dogs = { "a_c_rottweiler", "a_c_husky", "a_c_westy", "a_c_retriever", "a_c_poodle", "a_c_pug", "a_c_chop" };
-                foreach (var s in dogs) DogModels.Add((uint)Function.Call<int>(Hash.GET_HASH_KEY, s));
-                string[] cats = { "a_c_cat_01" };
-                foreach (var s in cats) CatModels.Add((uint)Function.Call<int>(Hash.GET_HASH_KEY, s));
-            }
-            catch { }
+            // Hash sets are prebuilt via field initializers.
         }
 
         public static bool IsDogModel(Model m) => DogModels.Contains((uint)m.Hash);
@@ -73,6 +76,8 @@ namespace AnimalArkShelter
 
         public static Vector3 CameraOffset { get; private set; } = new Vector3(2.2f, 2.6f, 1.2f);
         public static Vector3 ShowcaseOffset { get; private set; } = new Vector3(1.6f, 1.2f, 0.0f);
+        public static Vector3 ShopkeeperOffset { get; private set; } = new Vector3(-0.8f, -0.5f, 0.0f);
+        public static string ShopkeeperModel { get; private set; } = "s_f_y_shop_low";
         public static float ShopFov { get; private set; } = 50.0f;
         public static int ShopEaseTimeMs { get; private set; } = 350;
         public static bool EnableWalkOffAnim { get; private set; } = true;
@@ -121,7 +126,7 @@ namespace AnimalArkShelter
             catch { }
         }
 
-        public static void DrawText(string text, float x, float y, float scale, int r, int g, int b, int a)
+        public static void DrawText(string text, float x, float y, float scale, int r, int g, int b, int a, bool centered = false)
         {
             try
             {
@@ -130,12 +135,29 @@ namespace AnimalArkShelter
                 Function.Call(Hash.SET_TEXT_COLOUR, r, g, b, a);
                 if (HudUseOutline) Function.Call(Hash.SET_TEXT_OUTLINE);
                 if (HudUseShadow) Function.Call(Hash.SET_TEXT_DROP_SHADOW);
+                Function.Call(Hash.SET_TEXT_CENTRE, centered);
 
                 Function.Call(Hash.BEGIN_TEXT_COMMAND_DISPLAY_TEXT, "STRING");
                 Function.Call(Hash.ADD_TEXT_COMPONENT_SUBSTRING_PLAYER_NAME, text);
                 Function.Call(Hash.END_TEXT_COMMAND_DISPLAY_TEXT, x, y);
             }
             catch { }
+        }
+
+        // Compute a world position from a local offset using the player's current facing.
+        // local.X = right, local.Y = forward, local.Z = up
+        public static Vector3 OffsetFromPlayerFacing(Vector3 origin, Vector3 local)
+        {
+            try
+            {
+                var me = Game.Player.Character;
+                var right = me.RightVector;
+                var forward = me.ForwardVector;
+                var up = new Vector3(0f, 0f, 1f);
+                return origin + right * local.X + forward * local.Y + up * local.Z;
+            }
+            catch { }
+            return origin + local; // safe fallback
         }
 
         // --- Grounding & placement helpers (no unsafe; use OutputArgument) ---
@@ -187,7 +209,7 @@ namespace AnimalArkShelter
         }
 
         // Simple on-screen keyboard
-        public static string GetUserTextInput(string title, string defaultText = "", int maxLen = 20)
+        public static string GetUserTextInput(string _, string defaultText = "", int maxLen = 20)
         {
             try
             {
@@ -202,6 +224,22 @@ namespace AnimalArkShelter
             }
             catch { }
             return defaultText;
+        }
+    }
+
+    // Helpers outside class would be invalid; keep within namespace class scope
+    // Build model hashes safely; swallow native failures
+    static partial class Utils
+    {
+        private static System.Collections.Generic.IEnumerable<uint> GetModelHashes(params string[] names)
+        {
+            foreach (var s in names)
+            {
+                uint h = 0;
+                try { h = (uint)GTA.Native.Function.Call<int>(GTA.Native.Hash.GET_HASH_KEY, s); }
+                catch { }
+                if (h != 0) yield return h;
+            }
         }
     }
 }

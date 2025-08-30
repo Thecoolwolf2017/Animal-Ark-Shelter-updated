@@ -9,10 +9,7 @@ namespace AnimalArkShelter
     {
         public static NativeMenu InteractionMenu;
 
-        // Track in-vehicle pose state
-        private static bool _vehPoseActive = false;
-        private static int _vehPoseVehHandle = 0;
-        private static VehicleSeat _vehPoseSeat = VehicleSeat.Passenger;
+        // Track in-vehicle pose state (removed unused backing fields)
 
         public PetInteractionMenu() { }
 
@@ -21,6 +18,8 @@ namespace AnimalArkShelter
             if (InteractionMenu != null) return;
 
             InteractionMenu = new NativeMenu("", "PET INTERACTION", "");
+            // Ensure the menu is processed and drawn
+            Main.UiPool.Add(InteractionMenu);
 
             var follow = new NativeItem("Follow", "Have your pet follow you");
             var stay = new NativeItem("Stay", "Tell your pet to stay here");
@@ -101,6 +100,10 @@ namespace AnimalArkShelter
                 var me = Game.Player.Character;
                 float dist = me.Position.DistanceTo(Main.Pet.Position);
 
+                // Break out of any idle/scenario/group so the pet can move
+                try { Function.Call(Hash.REMOVE_PED_FROM_GROUP, Main.Pet.Handle); } catch { }
+                try { Function.Call(Hash.CLEAR_PED_TASKS, Main.Pet.Handle); } catch { }
+
                 if (Utils.ComeWarpIfFar && dist > Utils.ComeWarpDistance)
                 {
                     Main.Pet.Position = me.Position + me.ForwardVector * -1.0f;
@@ -108,7 +111,8 @@ namespace AnimalArkShelter
                 }
                 else
                 {
-                    Function.Call(Hash.TASK_GO_TO_ENTITY, Main.Pet.Handle, me.Handle, Utils.ComeStopRange, Utils.ComeRunSpeed, 0f, 0, 0);
+                    // Proper argument order: duration, stopRange, speed, p5, p6
+                    Function.Call(Hash.TASK_GO_TO_ENTITY, Main.Pet.Handle, me.Handle, -1, Utils.ComeStopRange, Utils.ComeRunSpeed, 0, 0);
                     int t = Game.GameTime + Utils.ComeStuckTeleportMs;
                     while (Game.GameTime < t)
                     {
@@ -152,9 +156,15 @@ namespace AnimalArkShelter
 
             try
             {
+                // Remove from group and clear tasks so animations stick
+                Function.Call(Hash.REMOVE_PED_FROM_GROUP, Main.Pet.Handle);
+                Function.Call(Hash.CLEAR_PED_TASKS, Main.Pet.Handle);
+                Script.Wait(100);
+
                 if (Utils.IsDogModel(Main.Pet.Model))
                 {
-                    Function.Call(Hash.TASK_START_SCENARIO_IN_PLACE, Main.Pet.Handle, "WORLD_DOG_SITTING", 0, true);
+                    // Use explicit sit anim for dogs (more reliable than scenario)
+                    PlayAnim(Main.Pet, "creatures@rottweiler@amb@world_dog_sitting@base", "base", 1, -1);
                 }
                 else
                 {
@@ -206,14 +216,13 @@ namespace AnimalArkShelter
 
                 Function.Call(Hash.TASK_ENTER_VEHICLE, Main.Pet.Handle, veh.Handle, -1, (int)seat, 1.2f, 1, 0);
 
-                // Auto-pose once in
-                Script.Wait(800);
+                // Wait until actually inside, then apply pose
+                int t = Game.GameTime + 3000;
+                while (Game.GameTime < t && !IsInAnyVehicle(Main.Pet)) { Script.Wait(50); }
                 if (IsInAnyVehicle(Main.Pet))
                 {
-                    _vehPoseActive = true;
-                    _vehPoseVehHandle = veh.Handle;
-                    _vehPoseSeat = seat;
-
+                    // Clear idle to ensure anim sticks
+                    Function.Call(Hash.CLEAR_PED_TASKS, Main.Pet.Handle);
                     if (Utils.VehiclePose == 0) PlayAnim(Main.Pet, "creatures@rottweiler@incar@std@ds@", "sit", 1, -1);
                     else /* lay */                    PlayAnim(Main.Pet, "creatures@rottweiler@incar@std@ds@", "sleep", 1, -1);
                 }
@@ -230,7 +239,7 @@ namespace AnimalArkShelter
                 Function.Call(Hash.TASK_LEAVE_ANY_VEHICLE, Main.Pet.Handle, 0, 0);
                 Script.Wait(600);
 
-                _vehPoseActive = false; _vehPoseVehHandle = 0;
+                // cleared vehicle pose state (no stored state)
 
                 // Nudge beside vehicle
                 var veh = Game.Player.Character.CurrentVehicle;
