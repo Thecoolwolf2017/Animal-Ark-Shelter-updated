@@ -1,8 +1,9 @@
 using GTA;
 using GTA.Math;
 using GTA.Native;
-using LemonUI.Menus;
-using System;
+using LemonUI.Menus; 
+using System; 
+using System.Collections.Generic;
 
 namespace AnimalArkShelter
 {
@@ -11,8 +12,11 @@ namespace AnimalArkShelter
         public static NativeMenu ShopMenu;
         public static Ped ShowcaseAnimal;
         public static Ped Shopkeeper;
-        public static Ped Customer;
-        public static Prop Bench;
+        public static Ped Customer; 
+        public static Prop Bench; 
+        public static List<Ped> ExtraCustomers = new();
+        public static List<Prop> ExtraBenches = new();
+        public static List<Prop> DecorProps = new();
 
         // Native camera (robust across SHVDN3 nightlies)
         private static int _shopCam = 0;
@@ -193,9 +197,15 @@ namespace AnimalArkShelter
                         Bench.MarkAsNoLongerNeeded();
                         Bench.Delete();
                     }
+                    foreach (var c in ExtraCustomers) { try { if (c != null && c.Exists()) { c.MarkAsNoLongerNeeded(); c.Delete(); } } catch { } }
+                    ExtraCustomers.Clear();
+                    foreach (var b in ExtraBenches) { try { if (b != null && b.Exists()) { b.MarkAsNoLongerNeeded(); b.Delete(); } } catch { } }
+                    ExtraBenches.Clear();
+                    foreach (var p in DecorProps) { try { if (p != null && p.Exists()) { p.MarkAsNoLongerNeeded(); p.Delete(); } } catch { } }
+                    DecorProps.Clear();
                 }
                 catch { }
-                Shopkeeper = null; Customer = null; Bench = null;
+                Shopkeeper = null; Customer = null; Bench = null; 
 
                 // Remove showcase animal when leaving without adopting
                 try { CleanupShowcase(); } catch { }
@@ -310,64 +320,143 @@ namespace AnimalArkShelter
             catch { }
         }
 
-        private static void EnsureShelterScene()
-        {
+        private static void EnsureShelterScene() 
+        { 
             try
             {
-                // Simple bench for waiting area
-                if (Utils.SpawnBench && (Bench == null || !Bench.Exists()))
+                // Simple bench for waiting area (primary)
+                if (Utils.SpawnBench && (Bench == null || !Bench.Exists())) 
+                { 
+                    var benchModel = new Model("prop_bench_01a"); 
+                    benchModel.Request(500); 
+                    if (benchModel.IsInCdImage && benchModel.IsValid) 
+                    { 
+                        var bpos = Main._shopPos + new Vector3(-1.2f, -1.6f, 0.0f); 
+                        if (!Utils.TryFindSafeCoordNear(bpos, 1.0f, out bpos)) 
+                        { 
+                            if (Utils.TryGetGroundZ(bpos, out var bgz) && bgz > 0f) bpos = new Vector3(bpos.X, bpos.Y, bgz + 0.02f); 
+                        } 
+                        Bench = World.CreateProp(benchModel, bpos, true, false); 
+                        if (Bench != null && Bench.Exists()) 
+                        { 
+                            // Face the showcase 
+                            var d = ShowcasePos - Bench.Position; d.Z = 0f; 
+                            if (d.Length() > 0.001f) 
+                            { 
+                                float heading = (float)(System.Math.Atan2(d.Y, d.X) * 180.0 / System.Math.PI); 
+                                Bench.Heading = heading; 
+                            } 
+                            Function.Call(Hash.FREEZE_ENTITY_POSITION, Bench.Handle, true); 
+                        } 
+                    } 
+                } 
+
+                // Extra benches
+                if (Utils.SpawnBench)
                 {
-                    var benchModel = new Model("prop_bench_01a");
-                    benchModel.Request(500);
+                    var benchModel = new Model("prop_bench_01a"); benchModel.Request(500);
                     if (benchModel.IsInCdImage && benchModel.IsValid)
                     {
-                        var bpos = Main._shopPos + new Vector3(-1.2f, -1.6f, 0.0f);
-                        if (!Utils.TryFindSafeCoordNear(bpos, 1.0f, out bpos))
+                        Vector3[] extraBenchOffsets = new Vector3[] { new Vector3(1.2f, -1.6f, 0f), new Vector3(0.0f, -2.2f, 0f) };
+                        int need = Math.Max(0, Utils.BenchCount - 1);
+                        for (int i = ExtraBenches.Count; i < Math.Min(need, extraBenchOffsets.Length); i++)
                         {
-                            if (Utils.TryGetGroundZ(bpos, out var bgz) && bgz > 0f) bpos = new Vector3(bpos.X, bpos.Y, bgz + 0.02f);
-                        }
-                        Bench = World.CreateProp(benchModel, bpos, true, false);
-                        if (Bench != null && Bench.Exists())
-                        {
-                            // Face the showcase
-                            var d = ShowcasePos - Bench.Position; d.Z = 0f;
-                            if (d.Length() > 0.001f)
+                            var pos = Main._shopPos + extraBenchOffsets[i];
+                            if (!Utils.TryFindSafeCoordNear(pos, 1.0f, out pos)) { if (Utils.TryGetGroundZ(pos, out var gz) && gz > 0f) pos = new Vector3(pos.X, pos.Y, gz + 0.02f); }
+                            var b = World.CreateProp(benchModel, pos, true, false);
+                            if (b != null && b.Exists())
                             {
-                                float heading = (float)(System.Math.Atan2(d.Y, d.X) * 180.0 / System.Math.PI);
-                                Bench.Heading = heading;
+                                var d = ShowcasePos - b.Position; d.Z = 0f;
+                                if (d.Length() > 0.001f)
+                                {
+                                    float heading = (float)(System.Math.Atan2(d.Y, d.X) * 180.0 / System.Math.PI);
+                                    b.Heading = heading;
+                                }
+                                Function.Call(Hash.FREEZE_ENTITY_POSITION, b.Handle, true);
+                                ExtraBenches.Add(b);
                             }
-                            Function.Call(Hash.FREEZE_ENTITY_POSITION, Bench.Handle, true);
                         }
                     }
                 }
 
-                // One customer looking at the showcase
-                if (Utils.SpawnCustomer && (Customer == null || !Customer.Exists()))
+                // One customer looking at the showcase (primary)
+                if (Utils.SpawnCustomer && (Customer == null || !Customer.Exists())) 
+                { 
+                    var cmodel = new Model("a_f_y_business_01"); 
+                    cmodel.Request(500); 
+                    if (cmodel.IsInCdImage && cmodel.IsValid) 
+                    { 
+                        var cpos = ShowcasePos + new Vector3(-0.8f, -0.9f, 0.0f); 
+                        if (!Utils.TryFindSafeCoordNear(cpos, 1.0f, out cpos)) 
+                        { 
+                            if (Utils.TryGetGroundZ(cpos, out var cgz) && cgz > 0f) cpos = new Vector3(cpos.X, cpos.Y, cgz + 0.02f); 
+                        } 
+                        Customer = World.CreatePed(cmodel, cpos); 
+                        if (Customer != null && Customer.Exists()) 
+                        { 
+                            var look = ShowcasePos; 
+                            var dir = look - Customer.Position; dir.Z = 0f; 
+                            if (dir.Length() > 0.001f) 
+                            { 
+                                float heading = (float)(System.Math.Atan2(dir.Y, dir.X) * 180.0 / System.Math.PI); 
+                                Customer.Heading = heading; 
+                            } 
+                            Customer.IsPersistent = true; 
+                            Function.Call(Hash.SET_BLOCKING_OF_NON_TEMPORARY_EVENTS, Customer.Handle, true); 
+                            Function.Call(Hash.TASK_START_SCENARIO_IN_PLACE, Customer.Handle, "WORLD_HUMAN_STAND_IMPATIENT", 0, true); 
+                        } 
+                    } 
+                } 
+
+                // Extra customers
+                if (Utils.SpawnCustomer)
                 {
-                    var cmodel = new Model("a_f_y_business_01");
-                    cmodel.Request(500);
-                    if (cmodel.IsInCdImage && cmodel.IsValid)
+                    string[] models = new[] { "a_m_y_business_01", "a_f_y_hipster_01", "a_m_y_skater_01" };
+                    Vector3[] offsets = new[] { new Vector3(0.9f, -1.0f, 0f), new Vector3(0.0f, -1.8f, 0f), new Vector3(1.6f, -0.6f, 0f) };
+                    int need = Math.Max(0, Utils.CustomerCount - 1);
+                    for (int i = ExtraCustomers.Count; i < Math.Min(need, offsets.Length); i++)
                     {
-                        var cpos = ShowcasePos + new Vector3(-0.8f, -0.9f, 0.0f);
-                        if (!Utils.TryFindSafeCoordNear(cpos, 1.0f, out cpos))
+                        var mdl = new Model(models[i % models.Length]); mdl.Request(500);
+                        if (!mdl.IsInCdImage || !mdl.IsValid) break;
+                        var pos = ShowcasePos + offsets[i];
+                        if (!Utils.TryFindSafeCoordNear(pos, 1.0f, out pos)) { if (Utils.TryGetGroundZ(pos, out var gz) && gz > 0f) pos = new Vector3(pos.X, pos.Y, gz + 0.02f); }
+                        var ped = World.CreatePed(mdl, pos);
+                        if (ped != null && ped.Exists())
                         {
-                            if (Utils.TryGetGroundZ(cpos, out var cgz) && cgz > 0f) cpos = new Vector3(cpos.X, cpos.Y, cgz + 0.02f);
-                        }
-                        Customer = World.CreatePed(cmodel, cpos);
-                        if (Customer != null && Customer.Exists())
-                        {
-                            var look = ShowcasePos;
-                            var dir = look - Customer.Position; dir.Z = 0f;
-                            if (dir.Length() > 0.001f)
-                            {
-                                float heading = (float)(System.Math.Atan2(dir.Y, dir.X) * 180.0 / System.Math.PI);
-                                Customer.Heading = heading;
-                            }
-                            Customer.IsPersistent = true;
-                            Function.Call(Hash.SET_BLOCKING_OF_NON_TEMPORARY_EVENTS, Customer.Handle, true);
-                            Function.Call(Hash.TASK_START_SCENARIO_IN_PLACE, Customer.Handle, "WORLD_HUMAN_STAND_IMPATIENT", 0, true);
+                            var dir = ShowcasePos - ped.Position; dir.Z = 0f; if (dir.Length() > 0.001f) { float heading = (float)(System.Math.Atan2(dir.Y, dir.X) * 180.0 / System.Math.PI); ped.Heading = heading; }
+                            ped.IsPersistent = true; Function.Call(Hash.SET_BLOCKING_OF_NON_TEMPORARY_EVENTS, ped.Handle, true);
+                            string[] scenarios = new[] { "WORLD_HUMAN_STAND_MOBILE", "WORLD_HUMAN_STAND_IMPATIENT", "WORLD_HUMAN_AA_SMOKE" };
+                            Function.Call(Hash.TASK_START_SCENARIO_IN_PLACE, ped.Handle, scenarios[i % scenarios.Length], 0, true);
+                            ExtraCustomers.Add(ped);
                         }
                     }
+                }
+
+                // Simple decor
+                if (Utils.SpawnDecor && DecorProps.Count == 0)
+                {
+                    TrySpawnDecor("prop_table_03", ShowcasePos + new Vector3(2.0f, -1.6f, 0f));
+                    TrySpawnDecor("prop_plant_int_01a", ShowcasePos + new Vector3(-2.0f, -1.6f, 0f));
+                }
+            }
+            catch { }
+        } 
+
+        private static void TrySpawnDecor(string modelName, Vector3 pos)
+        {
+            try
+            {
+                var m = new Model(modelName); m.Request(500);
+                if (!m.IsInCdImage || !m.IsValid) return;
+                if (!Utils.TryFindSafeCoordNear(pos, 1.0f, out pos))
+                {
+                    if (Utils.TryGetGroundZ(pos, out var gz) && gz > 0f) pos = new Vector3(pos.X, pos.Y, gz + 0.02f);
+                }
+                var p = World.CreateProp(m, pos, true, false);
+                if (p != null && p.Exists())
+                {
+                    Function.Call(Hash.FREEZE_ENTITY_POSITION, p.Handle, true);
+                    DecorProps.Add(p);
                 }
             }
             catch { }

@@ -51,9 +51,12 @@ namespace AnimalArkShelter
                 float sz = ini.GetValue("Shop", "SceneZ", 41.3537f);
                 SceneAnchor = new Vector3(sx, sy, sz);
 
-                // Scene dressing toggles
+                // Scene dressing toggles and counts
                 SpawnBench = ini.GetValue("Shop", "SpawnBench", true);
                 SpawnCustomer = ini.GetValue("Shop", "SpawnCustomer", true);
+                SpawnDecor = ini.GetValue("Shop", "SpawnDecor", true);
+                BenchCount = Math.Max(0, ini.GetValue("Shop", "BenchCount", 2));
+                CustomerCount = Math.Max(0, ini.GetValue("Shop", "CustomerCount", 2));
 
                 ComeWarpIfFar = ini.GetValue("ComeHere", "WarpIfFar", true);
                 ComeWarpDistance = ini.GetValue("ComeHere", "WarpDistance", 120.0f);
@@ -89,6 +92,9 @@ namespace AnimalArkShelter
         public static Vector3 SceneAnchor { get; private set; } = new Vector3(597.0833f, 2800.7881f, 41.3537f);
         public static bool SpawnBench { get; private set; } = true;
         public static bool SpawnCustomer { get; private set; } = true;
+        public static bool SpawnDecor { get; private set; } = true;
+        public static int BenchCount { get; private set; } = 2;
+        public static int CustomerCount { get; private set; } = 2;
         public static Vector3 ShopkeeperOffset { get; private set; } = new Vector3(-0.8f, -0.5f, 0.0f);
         public static string ShopkeeperModel { get; private set; } = "s_f_y_shop_low";
         public static float ShopFov { get; private set; } = 62.0f;
