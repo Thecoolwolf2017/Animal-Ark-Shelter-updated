@@ -170,7 +170,7 @@ namespace AnimalArkShelter
                 }
 
                 if (Shopkeeper == null || !Shopkeeper.Exists()) EnsureShopkeeper();
-                if (Customer == null || !Customer.Exists() || Bench == null || !Bench.Exists()) EnsureShelterScene();
+                if ((Customer == null || !Customer.Exists() || Bench == null || !Bench.Exists())) EnsureShelterScene();
             }
             else
             {
@@ -196,6 +196,9 @@ namespace AnimalArkShelter
                 }
                 catch { }
                 Shopkeeper = null; Customer = null; Bench = null;
+
+                // Remove showcase animal when leaving without adopting
+                try { CleanupShowcase(); } catch { }
             }
         }
 
@@ -312,7 +315,7 @@ namespace AnimalArkShelter
             try
             {
                 // Simple bench for waiting area
-                if (Bench == null || !Bench.Exists())
+                if (Utils.SpawnBench && (Bench == null || !Bench.Exists()))
                 {
                     var benchModel = new Model("prop_bench_01a");
                     benchModel.Request(500);
@@ -339,7 +342,7 @@ namespace AnimalArkShelter
                 }
 
                 // One customer looking at the showcase
-                if (Customer == null || !Customer.Exists())
+                if (Utils.SpawnCustomer && (Customer == null || !Customer.Exists()))
                 {
                     var cmodel = new Model("a_f_y_business_01");
                     cmodel.Request(500);

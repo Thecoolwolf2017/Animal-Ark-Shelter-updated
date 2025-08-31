@@ -51,6 +51,10 @@ namespace AnimalArkShelter
                 float sz = ini.GetValue("Shop", "SceneZ", 41.3537f);
                 SceneAnchor = new Vector3(sx, sy, sz);
 
+                // Scene dressing toggles
+                SpawnBench = ini.GetValue("Shop", "SpawnBench", true);
+                SpawnCustomer = ini.GetValue("Shop", "SpawnCustomer", true);
+
                 ComeWarpIfFar = ini.GetValue("ComeHere", "WarpIfFar", true);
                 ComeWarpDistance = ini.GetValue("ComeHere", "WarpDistance", 120.0f);
                 ComeRunSpeed = ini.GetValue("ComeHere", "RunSpeed", 3.0f);
@@ -83,6 +87,8 @@ namespace AnimalArkShelter
         public static Vector3 CameraOffset { get; private set; } = new Vector3(4.5f, 4.0f, 1.6f);
         public static Vector3 ShowcaseOffset { get; private set; } = new Vector3(1.6f, 1.2f, 0.0f);
         public static Vector3 SceneAnchor { get; private set; } = new Vector3(597.0833f, 2800.7881f, 41.3537f);
+        public static bool SpawnBench { get; private set; } = true;
+        public static bool SpawnCustomer { get; private set; } = true;
         public static Vector3 ShopkeeperOffset { get; private set; } = new Vector3(-0.8f, -0.5f, 0.0f);
         public static string ShopkeeperModel { get; private set; } = "s_f_y_shop_low";
         public static float ShopFov { get; private set; } = 62.0f;
