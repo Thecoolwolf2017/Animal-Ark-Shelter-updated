@@ -46,7 +46,7 @@ namespace AnimalArkShelter
         {
             if (ShopMenu != null) return;
 
-            ShopMenu = new NativeMenu("ANIMAL ARK", "Pet Store", "");
+            ShopMenu = new NativeMenu("ANIMAL ARK", "Shelter", "");
             Main.UiPool.Add(ShopMenu);
 
             // Add animals first
@@ -154,6 +154,8 @@ namespace AnimalArkShelter
 
             if (ShopMenu != null && ShopMenu.Visible)
             {
+                // Lock inputs to menu only
+                Utils.LockGameplayControlsForMenu();
                 int idx = ShopMenu.SelectedIndex;
                 if (idx != _lastIndexShown && idx >= 0 && idx < Animals.Length)
                 {
@@ -166,6 +168,17 @@ namespace AnimalArkShelter
             else
             {
                 if (_shopCam != 0) CleanupCamera();
+                // Despawn shopkeeper when leaving the shop UI
+                try
+                {
+                    if (Shopkeeper != null && Shopkeeper.Exists())
+                    {
+                        Shopkeeper.MarkAsNoLongerNeeded();
+                        Shopkeeper.Delete();
+                    }
+                }
+                catch { }
+                Shopkeeper = null;
             }
         }
 
@@ -211,8 +224,12 @@ namespace AnimalArkShelter
             if (!model.IsInCdImage || !model.IsValid) return;
 
             var pos = ShowcasePos;
-            if (Utils.TryGetGroundZ(pos, out var groundZ) && groundZ > 0f)
-                pos = new Vector3(pos.X, pos.Y, groundZ + 0.05f);
+            // Snap to a nearby safe coord if available
+            if (!Utils.TryFindSafeCoordNear(pos, 1.5f, out pos))
+            {
+                if (Utils.TryGetGroundZ(pos, out var groundZ) && groundZ > 0f)
+                    pos = new Vector3(pos.X, pos.Y, groundZ + 0.05f);
+            }
 
             ShowcaseAnimal = World.CreatePed(model, pos);
             if (ShowcaseAnimal != null && ShowcaseAnimal.Exists())
@@ -241,7 +258,10 @@ namespace AnimalArkShelter
                 if (!model.IsInCdImage || !model.IsValid) return;
 
                 var pos = Main._shopPos + Utils.ShopkeeperOffset;
-                if (Utils.TryGetGroundZ(pos, out var gz) && gz > 0f) pos = new Vector3(pos.X, pos.Y, gz + 0.05f);
+                if (!Utils.TryFindSafeCoordNear(pos, 1.5f, out pos))
+                {
+                    if (Utils.TryGetGroundZ(pos, out var gz) && gz > 0f) pos = new Vector3(pos.X, pos.Y, gz + 0.05f);
+                }
 
                 Shopkeeper = World.CreatePed(model, pos);
                 if (Shopkeeper != null && Shopkeeper.Exists())
@@ -347,6 +367,7 @@ namespace AnimalArkShelter
                 Function.Call(Hash.SET_PED_AS_GROUP_MEMBER, Main.Pet.Handle, Function.Call<int>(Hash.GET_PLAYER_GROUP, Function.Call<int>(Hash.PLAYER_ID)));
                 Function.Call(Hash.SET_PED_NEVER_LEAVES_GROUP, Main.Pet.Handle, true);
                 Function.Call(Hash.TASK_FOLLOW_TO_OFFSET_OF_ENTITY, Main.Pet.Handle, me.Handle, 0.0f, -1.2f, 0.0f, 2.2f, -1, 2.0f, true);
+                try { PetInteractionMenu.SetFollowState(true); } catch { }
             }
             catch { }
 

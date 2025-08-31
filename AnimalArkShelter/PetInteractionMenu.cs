@@ -11,7 +11,48 @@ namespace AnimalArkShelter
 
         // Track in-vehicle pose state (removed unused backing fields)
 
-        public PetInteractionMenu() { }
+        // Follow/Stay state tracking for auto behavior
+        private static bool _following = false;
+        private static bool _staying = false;
+
+        private void OnTick(object sender, System.EventArgs e)
+        {
+            try
+            {
+                if (!Main.HasPet || Main.Pet == null || !Main.Pet.Exists()) return;
+                var me = Game.Player.Character;
+
+                var meVeh = me.CurrentVehicle;
+                bool meInVeh = meVeh != null && meVeh.Exists();
+                bool petInVeh = IsInAnyVehicle(Main.Pet);
+
+                if (_following && !_staying)
+                {
+                    if (meInVeh && !petInVeh)
+                    {
+                        // Bring follower pet into vehicle
+                        DoEnterVehicle();
+                    }
+                    else if (!meInVeh && petInVeh)
+                    {
+                        // Get out to keep up on foot
+                        DoExitVehicle();
+                    }
+                }
+            }
+            catch { }
+        }
+
+        public PetInteractionMenu()
+        {
+            Tick += OnTick;
+        }
+
+        public static void SetFollowState(bool follow)
+        {
+            _following = follow;
+            _staying = !follow && _staying; // don't force clear stay unless invoked
+        }
 
         public static void EnsureMenu()
         {
@@ -74,8 +115,11 @@ namespace AnimalArkShelter
             try
             {
                 var me = Game.Player.Character;
+                _staying = false; _following = true;
                 Function.Call(Hash.SET_PED_AS_GROUP_MEMBER, Main.Pet.Handle, Function.Call<int>(Hash.GET_PLAYER_GROUP, Function.Call<int>(Hash.PLAYER_ID)));
                 Function.Call(Hash.SET_PED_NEVER_LEAVES_GROUP, Main.Pet.Handle, true);
+                Function.Call(Hash.CLEAR_PED_SECONDARY_TASK, Main.Pet.Handle);
+                Function.Call(Hash.CLEAR_PED_TASKS, Main.Pet.Handle);
                 Function.Call(Hash.TASK_FOLLOW_TO_OFFSET_OF_ENTITY, Main.Pet.Handle, me.Handle, 0.0f, -1.2f, 0.0f, 2.2f, -1, 2.0f, true);
                 Utils.Notify($"{Main.PetName} is following.");
             }
@@ -86,6 +130,7 @@ namespace AnimalArkShelter
         {
             try
             {
+                _staying = true; _following = false;
                 Function.Call(Hash.CLEAR_PED_TASKS, Main.Pet.Handle);
                 Function.Call(Hash.REMOVE_PED_FROM_GROUP, Main.Pet.Handle);
                 Utils.Notify($"{Main.PetName} will stay.");
@@ -123,6 +168,8 @@ namespace AnimalArkShelter
                 }
 
                 Function.Call(Hash.TASK_TURN_PED_TO_FACE_ENTITY, Main.Pet.Handle, me.Handle, -1);
+                // Switch to follow after arriving
+                DoFollow();
                 Utils.Notify($"{Main.PetName} is here.");
             }
             catch { }
@@ -223,8 +270,16 @@ namespace AnimalArkShelter
                 {
                     // Clear idle to ensure anim sticks
                     Function.Call(Hash.CLEAR_PED_TASKS, Main.Pet.Handle);
-                    if (Utils.VehiclePose == 0) PlayAnim(Main.Pet, "creatures@rottweiler@incar@std@ds@", "sit", 1, -1);
-                    else /* lay */                    PlayAnim(Main.Pet, "creatures@rottweiler@incar@std@ds@", "sleep", 1, -1);
+                    if (Utils.IsDogModel(Main.Pet.Model))
+                    {
+                        if (Utils.VehiclePose == 0) PlayAnim(Main.Pet, "creatures@rottweiler@incar@std@ds@", "sit", 1, -1);
+                        else /* lay */                    PlayAnim(Main.Pet, "creatures@rottweiler@incar@std@ds@", "sleep", 1, -1);
+                    }
+                    else if (Utils.IsCatModel(Main.Pet.Model))
+                    {
+                        // Cats: use a compact idle to reduce clipping
+                        PlayAnim(Main.Pet, "creatures@cat@amb@world_cat_sleeping_ledge@base", "base", 1, -1);
+                    }
                 }
             }
             catch { }
@@ -288,6 +343,8 @@ namespace AnimalArkShelter
             Main.HasPet = false;
             BuyPetMenu.ClearHealthBar();
             Hud.Hide();
+            Hide();
+            _following = false; _staying = false;
         }
     }
 }

@@ -115,6 +115,35 @@ namespace AnimalArkShelter
             try { GTA.UI.Notification.PostTicker(msg, false, true); } catch { }
         }
 
+        // Lock gameplay controls for menu interaction. Re-enable only frontend navigation per frame.
+        public static void LockGameplayControlsForMenu()
+        {
+            try
+            {
+                for (int g = 0; g <= 2; g++) Function.Call(Hash.DISABLE_ALL_CONTROL_ACTIONS, g);
+                int[] allow = new int[]
+                {
+                    (int)GTA.Control.FrontendUp,
+                    (int)GTA.Control.FrontendDown,
+                    (int)GTA.Control.FrontendLeft,
+                    (int)GTA.Control.FrontendRight,
+                    (int)GTA.Control.FrontendAccept,
+                    (int)GTA.Control.FrontendCancel,
+                    (int)GTA.Control.FrontendX,
+                    (int)GTA.Control.FrontendY,
+                    (int)GTA.Control.FrontendLb,
+                    (int)GTA.Control.FrontendRb
+                };
+                foreach (var id in allow)
+                {
+                    Function.Call(Hash.ENABLE_CONTROL_ACTION, 0, id, true);
+                    Function.Call(Hash.ENABLE_CONTROL_ACTION, 1, id, true);
+                    Function.Call(Hash.ENABLE_CONTROL_ACTION, 2, id, true);
+                }
+            }
+            catch { }
+        }
+
         public static void DisplayHelpTextThisFrame(string text)
         {
             try
