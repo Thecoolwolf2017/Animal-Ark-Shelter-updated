@@ -84,3 +84,11 @@ Tip: Camera and showcase offsets are fixed world offsets from the shop anchor. I
 
 ## Disclaimer
 This project is a fan‑made mod for GTA V. Use at your own risk. Not affiliated with Rockstar Games.
+
+## Documentation
+- See docs/Home.md for a wiki-style overview
+- docs/Installation.md for setup
+- docs/Configuration.md for INI options
+- docs/Pet-Commands.md for behaviors
+- docs/Shop-and-Camera.md for showcase/camera tuning
+- docs/Troubleshooting.md for fixes

@@ -18,3 +18,6 @@ Thumbs.db
 
 # Logs
 *.log
+temp_listing.txt
+/.vscode
+/.idea
