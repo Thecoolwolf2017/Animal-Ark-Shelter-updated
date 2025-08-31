@@ -1,0 +1,28 @@
+@startuml
+title Animal Ark Shelter – CI/CD Overview
+
+actor Developer
+participant GitHub as GH
+database "Artifacts" as Art
+
+Developer -> GH : push (main)
+activate GH
+GH -> GH : Workflow: Build (Release x64)
+GH -> Art : Upload DLL + INI artifacts
+deactivate GH
+
+Developer -> GH : create tag (vX.Y.Z)
+activate GH
+GH -> GH : Workflow: Release (zip dist/)
+GH -> GH : Publish GitHub Release
+deactivate GH
+
+== Security ==
+GH -> GH : Workflow: CodeQL (C#)
+note right
+  Runs on push/PR/schedule
+  Reports findings to Security tab
+end note
+
+@enduml
+
