@@ -23,9 +23,9 @@ namespace AnimalArkShelter
             {
                 var ini = ScriptSettings.Load(@"scripts\\AnimalArkShelter.ini");
 
-                float camX = ini.GetValue("Shop", "CameraOffsetX", 2.2f);
-                float camY = ini.GetValue("Shop", "CameraOffsetY", 2.6f);
-                float camZ = ini.GetValue("Shop", "CameraOffsetZ", 1.2f);
+                float camX = ini.GetValue("Shop", "CameraOffsetX", 4.5f);
+                float camY = ini.GetValue("Shop", "CameraOffsetY", 4.0f);
+                float camZ = ini.GetValue("Shop", "CameraOffsetZ", 1.6f);
                 CameraOffset = new Vector3(camX, camY, camZ);
 
                 float showX = ini.GetValue("Shop", "ShowcaseOffsetX", 1.6f);
@@ -40,10 +40,16 @@ namespace AnimalArkShelter
                 ShopkeeperOffset = new Vector3(skX, skY, skZ);
                 ShopkeeperModel = ini.GetValue("Shop", "ShopkeeperModel", "s_f_y_shop_low");
 
-                ShopFov = ini.GetValue("Shop", "FOV", 50.0f);
+                ShopFov = ini.GetValue("Shop", "FOV", 62.0f);
                 ShopEaseTimeMs = ini.GetValue("Shop", "EaseTimeMs", 350);
                 EnableWalkOffAnim = ini.GetValue("Shop", "EnableWalkOffAnim", true);
                 WalkOffDistance = ini.GetValue("Shop", "WalkOffDistance", 1.5f);
+
+                // Scene anchor separate from door/blip
+                float sx = ini.GetValue("Shop", "SceneX", 597.0833f);
+                float sy = ini.GetValue("Shop", "SceneY", 2800.7881f);
+                float sz = ini.GetValue("Shop", "SceneZ", 41.3537f);
+                SceneAnchor = new Vector3(sx, sy, sz);
 
                 ComeWarpIfFar = ini.GetValue("ComeHere", "WarpIfFar", true);
                 ComeWarpDistance = ini.GetValue("ComeHere", "WarpDistance", 120.0f);
@@ -74,11 +80,12 @@ namespace AnimalArkShelter
         public static bool IsDogModel(Model m) => DogModels.Contains((uint)m.Hash);
         public static bool IsCatModel(Model m) => CatModels.Contains((uint)m.Hash);
 
-        public static Vector3 CameraOffset { get; private set; } = new Vector3(2.2f, 2.6f, 1.2f);
+        public static Vector3 CameraOffset { get; private set; } = new Vector3(4.5f, 4.0f, 1.6f);
         public static Vector3 ShowcaseOffset { get; private set; } = new Vector3(1.6f, 1.2f, 0.0f);
+        public static Vector3 SceneAnchor { get; private set; } = new Vector3(597.0833f, 2800.7881f, 41.3537f);
         public static Vector3 ShopkeeperOffset { get; private set; } = new Vector3(-0.8f, -0.5f, 0.0f);
         public static string ShopkeeperModel { get; private set; } = "s_f_y_shop_low";
-        public static float ShopFov { get; private set; } = 50.0f;
+        public static float ShopFov { get; private set; } = 62.0f;
         public static int ShopEaseTimeMs { get; private set; } = 350;
         public static bool EnableWalkOffAnim { get; private set; } = true;
         public static float WalkOffDistance { get; private set; } = 1.5f;

@@ -19,24 +19,27 @@ namespace AnimalArkShelter
 
         private static NativeItem _suppliesItem;
 
-        private class AnimalDef(string name, string model, int price)
-        {
-            public string Name = name;
-            public string Model = model;
-            public int Price = price;
-        }
+        private class AnimalDef(string name, string model, int price) 
+        { 
+            public string Name = name; 
+            public string Model = model; 
+            public int Price = price; 
+        } 
 
-        private static readonly AnimalDef[] Animals =
-        [
-            new("Cat",        "a_c_cat_01",     500),
-            new("Husky",      "a_c_husky",      1200),
-            new("Westy",      "a_c_westy",      800),
-            new("Poodle",     "a_c_poodle",     900),
-            new("Rottweiler", "a_c_rottweiler", 1100),
-            new("Retriever",  "a_c_retriever",  1100),
-            new("Pug",        "a_c_pug",        850),
-            new("Chop",       "a_c_chop",       1500),
-        ];
+        private static readonly AnimalDef[] Animals = 
+        [ 
+            new("Cat",        "a_c_cat_01",     500), 
+            new("Husky",      "a_c_husky",      1200), 
+            new("Westy",      "a_c_westy",      800), 
+            new("Poodle",     "a_c_poodle",     900), 
+            new("Rottweiler", "a_c_rottweiler", 1100), 
+            new("Retriever",  "a_c_retriever",  1100), 
+            new("Pug",        "a_c_pug",        850), 
+            new("Chop",       "a_c_chop",       1500), 
+            new("Rabbit",     "a_c_rabbit_01",  300),
+            new("Coyote",     "a_c_coyote",     1500),
+            new("Deer",       "a_c_deer",       2200),
+        ]; 
 
         public BuyPetMenu()
         {
@@ -147,8 +150,8 @@ namespace AnimalArkShelter
         private static int _lastIndexShown = -1;
 
         // Fixed world offsets from the shop anchor (not player-facing)
-        private static Vector3 ShowcasePos => Main._shopPos + Utils.ShowcaseOffset;
-        private static Vector3 CameraPos => Main._shopPos + Utils.CameraOffset;
+        private static Vector3 ShowcasePos => Utils.SceneAnchor + Utils.ShowcaseOffset;
+        private static Vector3 CameraPos => Utils.SceneAnchor + Utils.CameraOffset;
 
         private void OnTick(object sender, EventArgs e)
         {
@@ -211,9 +214,18 @@ namespace AnimalArkShelter
                     Function.Call(Hash.SET_CAM_COORD, _shopCam, camPos.X, camPos.Y, camPos.Z);
                     Function.Call(Hash.SET_CAM_ROT, _shopCam, 0.0f, 0.0f, 0.0f, 2);
                     Function.Call(Hash.SET_CAM_FOV, _shopCam, Utils.ShopFov);
-                    // Aim at the actual ped if available, otherwise fallback; slight Z lift for framing
-                    var look = (ShowcaseAnimal != null && ShowcaseAnimal.Exists()) ? ShowcaseAnimal.Position : ShowcasePos;
-                    Function.Call(Hash.POINT_CAM_AT_COORD, _shopCam, look.X, look.Y, look.Z + 0.3f);
+                    // Aim between showcase and bench if present to frame the whole scene
+                    var look = ShowcasePos;
+                    try
+                    {
+                        if (Bench != null && Bench.Exists())
+                        {
+                            var mid = (Bench.Position + ShowcasePos) * 0.5f;
+                            look = mid;
+                        }
+                    }
+                    catch { }
+                    Function.Call(Hash.POINT_CAM_AT_COORD, _shopCam, look.X, look.Y, look.Z + 0.5f);
                     Function.Call(Hash.SET_CAM_ACTIVE, _shopCam, true);
                     Function.Call(Hash.RENDER_SCRIPT_CAMS, true, true, Utils.ShopEaseTimeMs, true, false, 0);
                 }
@@ -271,7 +283,7 @@ namespace AnimalArkShelter
                 model.Request(500);
                 if (!model.IsInCdImage || !model.IsValid) return;
 
-                var pos = Main._shopPos + Utils.ShopkeeperOffset;
+                var pos = Utils.SceneAnchor + Utils.ShopkeeperOffset;
                 if (!Utils.TryFindSafeCoordNear(pos, 1.5f, out pos))
                 {
                     if (Utils.TryGetGroundZ(pos, out var gz) && gz > 0f) pos = new Vector3(pos.X, pos.Y, gz + 0.05f);

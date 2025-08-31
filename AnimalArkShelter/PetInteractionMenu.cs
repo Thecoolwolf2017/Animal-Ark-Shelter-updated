@@ -69,6 +69,8 @@ namespace AnimalArkShelter
             var lie = new NativeItem("Lay Down", "Make your pet lay down");
             var enterVeh = new NativeItem("Enter Vehicle", "Put your pet into your vehicle");
             var exitVeh = new NativeItem("Exit Vehicle", "Have your pet exit the vehicle");
+            var attack = new NativeItem("Attack Target", "Attack the ped you aim at");
+            var pet = new NativeItem("Pet", "Give your pet some love");
             var heal = new NativeItem("Treat (+10 HP)", "Feed a quick treat");
             var dismiss = new NativeItem("Dismiss Pet", "Send your pet home");
 
@@ -79,6 +81,8 @@ namespace AnimalArkShelter
             InteractionMenu.Add(lie);
             InteractionMenu.Add(enterVeh);
             InteractionMenu.Add(exitVeh);
+            InteractionMenu.Add(attack);
+            InteractionMenu.Add(pet);
             InteractionMenu.Add(heal);
             InteractionMenu.Add(dismiss);
 
@@ -94,6 +98,8 @@ namespace AnimalArkShelter
                 else if (item == lie) DoLay();
                 else if (item == enterVeh) DoEnterVehicle();
                 else if (item == exitVeh) DoExitVehicle();
+                else if (item == attack) DoAttackTarget();
+                else if (item == pet) DoPet();
                 else if (item == heal) DoHeal();
                 else if (item == dismiss) DoDismiss();
             };
@@ -215,8 +221,8 @@ namespace AnimalArkShelter
                 }
                 else
                 {
-                    // Cat substitute
-                    PlayAnim(Main.Pet, "creatures@cat@amb@world_cat_sleeping_ledge@base", "base", 1, -1);
+                    // Cat: prefer ground base to avoid floating
+                    PlayAnim(Main.Pet, "creatures@cat@amb@world_cat_sleeping_ground@base", "base", 1, -1);
                 }
                 Utils.Notify($"{Main.PetName} sits.");
             }
@@ -264,7 +270,7 @@ namespace AnimalArkShelter
                 Function.Call(Hash.TASK_ENTER_VEHICLE, Main.Pet.Handle, veh.Handle, -1, (int)seat, 1.2f, 1, 0);
 
                 // Wait until actually inside, then apply pose
-                int t = Game.GameTime + 3000;
+                int t = Game.GameTime + 5000;
                 while (Game.GameTime < t && !IsInAnyVehicle(Main.Pet)) { Script.Wait(50); }
                 if (IsInAnyVehicle(Main.Pet))
                 {
@@ -281,6 +287,63 @@ namespace AnimalArkShelter
                         PlayAnim(Main.Pet, "creatures@cat@amb@world_cat_sleeping_ledge@base", "base", 1, -1);
                     }
                 }
+            }
+            catch { }
+        }
+
+        private static Ped GetAimedPed()
+        {
+            try
+            {
+                int pid = Function.Call<int>(Hash.PLAYER_ID);
+                var outEnt = new OutputArgument();
+                if (Function.Call<bool>(Hash.GET_ENTITY_PLAYER_IS_FREE_AIMING_AT, pid, outEnt))
+                {
+                    int handle = outEnt.GetResult<int>();
+                    var ent = Entity.FromHandle(handle) as Ped;
+                    if (ent != null && ent.Exists()) return ent;
+                }
+            }
+            catch { }
+            return null;
+        }
+
+        private static void DoAttackTarget()
+        {
+            try
+            {
+                var target = GetAimedPed();
+                if (target == null || !target.Exists()) { Utils.Notify("~o~Aim at a target first."); return; }
+
+                Function.Call(Hash.REMOVE_PED_FROM_GROUP, Main.Pet.Handle);
+                Function.Call(Hash.CLEAR_PED_TASKS, Main.Pet.Handle);
+                Function.Call(Hash.TASK_COMBAT_PED, Main.Pet.Handle, target.Handle, 0, 16);
+                _staying = false; _following = false;
+                Utils.Notify($"Attacking {target.Model.Hash}.");
+            }
+            catch { }
+        }
+
+        private static void DoPet()
+        {
+            try
+            {
+                var me = Game.Player.Character;
+                if (me.Position.DistanceTo(Main.Pet.Position) > 2.0f)
+                {
+                    Function.Call(Hash.TASK_GO_TO_ENTITY, Main.Pet.Handle, me.Handle, -1, 1.2f, 2.0f, 0, 0);
+                    Script.Wait(500);
+                }
+                Function.Call(Hash.TASK_TURN_PED_TO_FACE_ENTITY, Main.Pet.Handle, me.Handle, -1);
+                if (Utils.IsDogModel(Main.Pet.Model))
+                {
+                    PlayAnim(Main.Pet, "creatures@rottweiler@amb@world_dog_sitting@base", "base", 1, 2000);
+                }
+                else if (Utils.IsCatModel(Main.Pet.Model))
+                {
+                    PlayAnim(Main.Pet, "creatures@cat@amb@world_cat_sleeping_ground@base", "base", 1, 2000);
+                }
+                Utils.Notify($"You pet {Main.PetName}.");
             }
             catch { }
         }
