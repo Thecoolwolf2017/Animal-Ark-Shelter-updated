@@ -92,3 +92,12 @@ This project is a fan‑made mod for GTA V. Use at your own risk. Not affiliated
 - docs/Pet-Commands.md for behaviors
 - docs/Shop-and-Camera.md for showcase/camera tuning
 - docs/Troubleshooting.md for fixes
+
+## Wiki
+- Home: https://github.com/Thecoolwolf2017/Animal-Ark-Shelter-updated/wiki/Home
+- Installation: https://github.com/Thecoolwolf2017/Animal-Ark-Shelter-updated/wiki/Installation
+- Configuration: https://github.com/Thecoolwolf2017/Animal-Ark-Shelter-updated/wiki/Configuration
+- Pet Commands: https://github.com/Thecoolwolf2017/Animal-Ark-Shelter-updated/wiki/Pet-Commands
+- Shop & Camera: https://github.com/Thecoolwolf2017/Animal-Ark-Shelter-updated/wiki/Shop-and-Camera
+- Scene and Behavior: https://github.com/Thecoolwolf2017/Animal-Ark-Shelter-updated/wiki/Scene-and-Behavior
+- Troubleshooting: https://github.com/Thecoolwolf2017/Animal-Ark-Shelter-updated/wiki/Troubleshooting
