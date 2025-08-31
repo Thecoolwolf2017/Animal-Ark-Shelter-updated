@@ -121,8 +121,8 @@ namespace AnimalArkShelter
             try
             {
                 for (int g = 0; g <= 2; g++) Function.Call(Hash.DISABLE_ALL_CONTROL_ACTIONS, g);
-                int[] allow = new int[]
-                {
+                int[] allow =
+                [
                     (int)GTA.Control.FrontendUp,
                     (int)GTA.Control.FrontendDown,
                     (int)GTA.Control.FrontendLeft,
@@ -133,7 +133,7 @@ namespace AnimalArkShelter
                     (int)GTA.Control.FrontendY,
                     (int)GTA.Control.FrontendLb,
                     (int)GTA.Control.FrontendRb
-                };
+                ];
                 foreach (var id in allow)
                 {
                     Function.Call(Hash.ENABLE_CONTROL_ACTION, 0, id, true);
