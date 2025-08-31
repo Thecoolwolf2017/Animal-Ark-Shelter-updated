@@ -13,5 +13,5 @@ Links:
 - [[Configuration]]
 - [[Pet Commands]]
 - [[Shop and Camera]]
+- [[Scene and Behavior]]
 - [[Troubleshooting]]
-

@@ -1,0 +1,558 @@
+1 `tusing GTA; 
+1 `tusing GTA.Math; 
+1 `tusing GTA.Native; 
+1 `tusing LemonUI.Menus; 
+1 `tusing System; 
+1 `tusing System.Collections.Generic; 
+1 `t 
+1 `tnamespace AnimalArkShelter 
+1 `t{ 
+1 `t    public class BuyPetMenu : Script 
+1 `t    { 
+1 `t        public static NativeMenu ShopMenu; 
+1 `t        public static Ped ShowcaseAnimal; 
+1 `t        public static Ped Shopkeeper; 
+1 `t        public static Ped Customer; 
+1 `t        public static Prop Bench; 
+1 `t        public static List<Ped> ExtraCustomers = new(); 
+1 `t        public static List<Prop> ExtraBenches = new(); 
+1 `t        public static List<Prop> DecorProps = new(); 
+1 `t 
+1 `t        // Native camera (robust across SHVDN3 nightlies) 
+1 `t        private static int _shopCam = 0; 
+1 `t 
+1 `t        private static NativeItem _suppliesItem; 
+1 `t 
+1 `t        private class AnimalDef(string name, string model, int price) 
+1 `t        { 
+1 `t            public string Name = name; 
+1 `t            public string Model = model; 
+1 `t            public int Price = price; 
+1 `t        } 
+1 `t 
+1 `t        private static readonly AnimalDef[] Animals = 
+1 `t        [ 
+1 `t            new("Cat",        "a_c_cat_01",     500), 
+1 `t            new("Husky",      "a_c_husky",      1200), 
+1 `t            new("Westy",      "a_c_westy",      800), 
+1 `t            new("Poodle",     "a_c_poodle",     900), 
+1 `t            new("Rottweiler", "a_c_rottweiler", 1100), 
+1 `t            new("Retriever",  "a_c_retriever",  1100), 
+1 `t            new("Pug",        "a_c_pug",        850), 
+1 `t            new("Chop",       "a_c_chop",       1500), 
+1 `t            new("Rabbit",     "a_c_rabbit_01",  300), 
+1 `t            new("Coyote",     "a_c_coyote",     1500), 
+1 `t            new("Deer",       "a_c_deer",       2200), 
+1 `t        ]; 
+1 `t 
+1 `t        public BuyPetMenu() 
+1 `t        { 
+1 `t            Tick += OnTick; 
+1 `t            Aborted += (s, e) => CleanupCamera(); 
+1 `t        } 
+1 `t 
+1 `t        public static void EnsureMenu() 
+1 `t        { 
+1 `t            if (ShopMenu != null) return; 
+1 `t 
+1 `t            ShopMenu = new NativeMenu("ANIMAL ARK", "Shelter", ""); 
+1 `t            Main.UiPool.Add(ShopMenu); 
+1 `t 
+1 `t            // Add animals first 
+1 `t            for (int i = 0; i < Animals.Length; i++) 
+1 `t            { 
+1 `t                var a = Animals[i]; 
+1 `t                var it = new NativeItem(a.Name, "Adopt this animal", "$" + a.Price); 
+1 `t                ShopMenu.Add(it); 
+1 `t            } 
+1 `t 
+1 `t            // Supplies at the end (no separator to avoid visual gap); enable only if player has a pet 
+1 `t            _suppliesItem = new NativeItem("Supplies...", "Buy items for your pet") 
+1 `t            { 
+1 `t                Enabled = Main.HasPet 
+1 `t            }; 
+1 `t            ShopMenu.Add(_suppliesItem); 
+1 `t 
+1 `t            ShopMenu.ItemActivated += (s, e) => 
+1 `t            { 
+1 `t                if (e.Item == _suppliesItem) 
+1 `t                { 
+1 `t                    if (!Main.HasPet) { Utils.Notify("~o~You need a pet first."); return; } 
+1 `t                    ShopMenu.Visible = false; // prevent overlap 
+1 `t                    try { BuyPetStuffMenu.Init(); } catch { } 
+1 `t                    return; 
+1 `t                } 
+1 `t 
+1 `t                // Animal adoption 
+1 `t                int idx = ShopMenu.SelectedIndex; 
+1 `t                if (idx >= 0 && idx < Animals.Length) 
+1 `t                { 
+1 `t                    AdoptFromShowcase(idx); 
+1 `t                } 
+1 `t            }; 
+1 `t        } 
+1 `t 
+1 `t        public static void Init() 
+1 `t        { 
+1 `t            EnsureMenu(); 
+1 `t            Main.IsShopping = true; 
+1 `t 
+1 `t            if (ShowcaseAnimal == null || !ShowcaseAnimal.Exists()) 
+1 `t            { 
+1 `t                SpawnOrSwapShowcase(Animals[0].Model); 
+1 `t                _lastIndexShown = 0; 
+1 `t            } 
+1 `t 
+1 `t            EnsureShopkeeper(); 
+1 `t            EnsureShelterScene(); 
+1 `t 
+1 `t            SetupShopCamera(); 
+1 `t            ShopMenu.Visible = true; 
+1 `t        } 
+1 `t 
+1 `t        public static void CleanupShowcase() 
+1 `t        { 
+1 `t            try 
+1 `t            { 
+1 `t                if (ShowcaseAnimal != null && ShowcaseAnimal.Exists()) 
+1 `t                { 
+1 `t                    ShowcaseAnimal.MarkAsNoLongerNeeded(); 
+1 `t                    ShowcaseAnimal.Delete(); 
+1 `t                } 
+1 `t            } 
+1 `t            catch { } 
+1 `t            ShowcaseAnimal = null; 
+1 `t 
+1 `t            try 
+1 `t            { 
+1 `t                if (Shopkeeper != null && Shopkeeper.Exists()) 
+1 `t                { 
+1 `t                    Shopkeeper.MarkAsNoLongerNeeded(); 
+1 `t                    Shopkeeper.Delete(); 
+1 `t                } 
+1 `t            } 
+1 `t            catch { } 
+1 `t            Shopkeeper = null; 
+1 `t        } 
+1 `t 
+1 `t        public static void ClearHealthBar() { try { Hud.Hide(); } catch { } } 
+1 `t 
+1 `t        private static void CleanupCamera() 
+1 `t        { 
+1 `t            try 
+1 `t            { 
+1 `t                if (_shopCam != 0 && Function.Call<bool>(Hash.DOES_CAM_EXIST, _shopCam)) 
+1 `t                { 
+1 `t                    Function.Call(Hash.RENDER_SCRIPT_CAMS, false, true, Utils.ShopEaseTimeMs, true, false, 0); 
+1 `t                    Function.Call(Hash.DESTROY_CAM, _shopCam, false); 
+1 `t                } 
+1 `t            } 
+1 `t            catch { } 
+1 `t            _shopCam = 0; 
+1 `t        } 
+1 `t 
+1 `t        private static int _lastIndexShown = -1; 
+1 `t 
+1 `t        // Fixed world offsets from the shop anchor (not player-facing) 
+1 `t        private static Vector3 ShowcasePos => Utils.SceneAnchor + Utils.ShowcaseOffset; 
+1 `t        private static Vector3 CameraPos => Utils.SceneAnchor + Utils.CameraOffset; 
+1 `t 
+1 `t        private void OnTick(object sender, EventArgs e) 
+1 `t        { 
+1 `t            // Keep supplies enabled state synced; no “gap” items used 
+1 `t            if (_suppliesItem != null) _suppliesItem.Enabled = Main.HasPet; 
+1 `t 
+1 `t            if (ShopMenu != null && ShopMenu.Visible) 
+1 `t            { 
+1 `t                // Lock inputs to menu only 
+1 `t                Utils.LockGameplayControlsForMenu(); 
+1 `t                int idx = ShopMenu.SelectedIndex; 
+1 `t                if (idx != _lastIndexShown && idx >= 0 && idx < Animals.Length) 
+1 `t                { 
+1 `t                    SpawnOrSwapShowcase(Animals[idx].Model); 
+1 `t                    _lastIndexShown = idx; 
+1 `t                } 
+1 `t 
+1 `t                if (Shopkeeper == null || !Shopkeeper.Exists()) EnsureShopkeeper(); 
+1 `t                if ((Customer == null || !Customer.Exists() || Bench == null || !Bench.Exists())) EnsureShelterScene(); 
+1 `t            } 
+1 `t            else 
+1 `t            { 
+1 `t                if (_shopCam != 0) CleanupCamera(); 
+1 `t                // Despawn shopkeeper when leaving the shop UI 
+1 `t                try 
+1 `t                { 
+1 `t                    if (Shopkeeper != null && Shopkeeper.Exists()) 
+1 `t                    { 
+1 `t                        Shopkeeper.MarkAsNoLongerNeeded(); 
+1 `t                        Shopkeeper.Delete(); 
+1 `t                    } 
+1 `t                    if (Customer != null && Customer.Exists()) 
+1 `t                    { 
+1 `t                        Customer.MarkAsNoLongerNeeded(); 
+1 `t                        Customer.Delete(); 
+1 `t                    } 
+1 `t                    if (Bench != null && Bench.Exists()) 
+1 `t                    { 
+1 `t                        Bench.MarkAsNoLongerNeeded(); 
+1 `t                        Bench.Delete(); 
+1 `t                    } 
+1 `t                    foreach (var c in ExtraCustomers) { try { if (c != null && c.Exists()) { c.MarkAsNoLongerNeeded(); c.Delete(); } } catch { } } 
+1 `t                    ExtraCustomers.Clear(); 
+1 `t                    foreach (var b in ExtraBenches) { try { if (b != null && b.Exists()) { b.MarkAsNoLongerNeeded(); b.Delete(); } } catch { } } 
+1 `t                    ExtraBenches.Clear(); 
+1 `t                    foreach (var p in DecorProps) { try { if (p != null && p.Exists()) { p.MarkAsNoLongerNeeded(); p.Delete(); } } catch { } } 
+1 `t                    DecorProps.Clear(); 
+1 `t                } 
+1 `t                catch { } 
+1 `t                Shopkeeper = null; Customer = null; Bench = null; 
+1 `t 
+1 `t                // Remove showcase animal when leaving without adopting 
+1 `t                try { CleanupShowcase(); } catch { } 
+1 `t            } 
+1 `t        } 
+1 `t 
+1 `t        private static void SetupShopCamera() 
+1 `t        { 
+1 `t            try 
+1 `t            { 
+1 `t                CleanupCamera(); 
+1 `t 
+1 `t                _shopCam = Function.Call<int>(Hash.CREATE_CAM, "DEFAULT_SCRIPTED_CAMERA", true); 
+1 `t                if (_shopCam != 0 && Function.Call<bool>(Hash.DOES_CAM_EXIST, _shopCam)) 
+1 `t                { 
+1 `t                    // Keep camera safely above ground 
+1 `t                    var camPos = CameraPos; 
+1 `t                    try { if (Utils.TryGetGroundZ(camPos, out var gz) && camPos.Z < gz + 0.6f) camPos = new Vector3(camPos.X, camPos.Y, gz + 0.6f); } catch { } 
+1 `t                    Function.Call(Hash.SET_CAM_COORD, _shopCam, camPos.X, camPos.Y, camPos.Z); 
+1 `t                    Function.Call(Hash.SET_CAM_ROT, _shopCam, 0.0f, 0.0f, 0.0f, 2); 
+1 `t                    Function.Call(Hash.SET_CAM_FOV, _shopCam, Utils.ShopFov); 
+1 `t                    // Aim between showcase and bench if present to frame the whole scene 
+1 `t                    var look = ShowcasePos; 
+1 `t                    try 
+1 `t                    { 
+1 `t                        if (Bench != null && Bench.Exists()) 
+1 `t                        { 
+1 `t                            var mid = (Bench.Position + ShowcasePos) * 0.5f; 
+1 `t                            look = mid; 
+1 `t                        } 
+1 `t                    } 
+1 `t                    catch { } 
+1 `t                    Function.Call(Hash.POINT_CAM_AT_COORD, _shopCam, look.X, look.Y, look.Z + 0.5f); 
+1 `t                    Function.Call(Hash.SET_CAM_ACTIVE, _shopCam, true); 
+1 `t                    Function.Call(Hash.RENDER_SCRIPT_CAMS, true, true, Utils.ShopEaseTimeMs, true, false, 0); 
+1 `t                } 
+1 `t            } 
+1 `t            catch { } 
+1 `t        } 
+1 `t 
+1 `t        private static void SpawnOrSwapShowcase(string modelName) 
+1 `t        { 
+1 `t            try 
+1 `t            { 
+1 `t                if (ShowcaseAnimal != null && ShowcaseAnimal.Exists()) 
+1 `t                { 
+1 `t                    ShowcaseAnimal.MarkAsNoLongerNeeded(); 
+1 `t                    ShowcaseAnimal.Delete(); 
+1 `t                } 
+1 `t            } 
+1 `t            catch { } 
+1 `t 
+1 `t            var model = new Model(modelName); 
+1 `t            model.Request(500); 
+1 `t            if (!model.IsInCdImage || !model.IsValid) return; 
+1 `t 
+1 `t            var pos = ShowcasePos; 
+1 `t            // Snap to a nearby safe coord if available 
+1 `t            if (!Utils.TryFindSafeCoordNear(pos, 1.5f, out pos)) 
+1 `t            { 
+1 `t                if (Utils.TryGetGroundZ(pos, out var groundZ) && groundZ > 0f) 
+1 `t                    pos = new Vector3(pos.X, pos.Y, groundZ + 0.05f); 
+1 `t            } 
+1 `t 
+1 `t            ShowcaseAnimal = World.CreatePed(model, pos); 
+1 `t            if (ShowcaseAnimal != null && ShowcaseAnimal.Exists()) 
+1 `t            { 
+1 `t                // Face the camera direction 
+1 `t                var toCam = CameraPos - ShowcaseAnimal.Position; toCam.Z = 0f; 
+1 `t                if (toCam.Length() > 0.001f) 
+1 `t                { 
+1 `t                    float heading = (float)(System.Math.Atan2(toCam.Y, toCam.X) * 180.0 / System.Math.PI); 
+1 `t                    ShowcaseAnimal.Heading = heading; 
+1 `t                } 
+1 `t                ShowcaseAnimal.IsPersistent = true; 
+1 `t                Function.Call(Hash.SET_PED_CAN_BE_TARGETTED, ShowcaseAnimal.Handle, false); 
+1 `t                Function.Call(Hash.SET_PED_CAN_RAGDOLL, ShowcaseAnimal.Handle, false); 
+1 `t                Function.Call(Hash.TASK_STAND_STILL, ShowcaseAnimal.Handle, -1); 
+1 `t            } 
+1 `t        } 
+1 `t 
+1 `t        private static void EnsureShopkeeper() 
+1 `t        { 
+1 `t            try 
+1 `t            { 
+1 `t                if (Shopkeeper != null && Shopkeeper.Exists()) return; 
+1 `t                var model = new Model(Utils.ShopkeeperModel); 
+1 `t                model.Request(500); 
+1 `t                if (!model.IsInCdImage || !model.IsValid) return; 
+1 `t 
+1 `t                var pos = Utils.SceneAnchor + Utils.ShopkeeperOffset; 
+1 `t                if (!Utils.TryFindSafeCoordNear(pos, 1.5f, out pos)) 
+1 `t                { 
+1 `t                    if (Utils.TryGetGroundZ(pos, out var gz) && gz > 0f) pos = new Vector3(pos.X, pos.Y, gz + 0.05f); 
+1 `t                } 
+1 `t 
+1 `t                Shopkeeper = World.CreatePed(model, pos); 
+1 `t                if (Shopkeeper != null && Shopkeeper.Exists()) 
+1 `t                { 
+1 `t                    var look = (ShowcaseAnimal != null && ShowcaseAnimal.Exists()) ? ShowcaseAnimal.Position : ShowcasePos; 
+1 `t                    var dir = look - Shopkeeper.Position; dir.Z = 0f; 
+1 `t                    if (dir.Length() > 0.001f) 
+1 `t                    { 
+1 `t                        float heading = (float)(System.Math.Atan2(dir.Y, dir.X) * 180.0 / System.Math.PI); 
+1 `t                        Shopkeeper.Heading = heading; 
+1 `t                    } 
+1 `t                    Shopkeeper.IsPersistent = true; 
+1 `t                    Function.Call(Hash.SET_BLOCKING_OF_NON_TEMPORARY_EVENTS, Shopkeeper.Handle, true); 
+1 `t                    Function.Call(Hash.TASK_START_SCENARIO_IN_PLACE, Shopkeeper.Handle, "WORLD_HUMAN_STAND_IMPATIENT", 0, true); 
+1 `t                } 
+1 `t            } 
+1 `t            catch { } 
+1 `t        } 
+1 `t 
+1 `t        private static void EnsureShelterScene() 
+1 `t        { 
+1 `t            try 
+1 `t            { 
+1 `t                // Simple bench for waiting area (primary) 
+1 `t                if (Utils.SpawnBench && (Bench == null || !Bench.Exists())) 
+1 `t                { 
+1 `t                    var benchModel = new Model("prop_bench_01a"); 
+1 `t                    benchModel.Request(500); 
+1 `t                    if (benchModel.IsInCdImage && benchModel.IsValid) 
+1 `t                    { 
+1 `t                        var bpos = Main._shopPos + new Vector3(-1.2f, -1.6f, 0.0f); 
+1 `t                        if (!Utils.TryFindSafeCoordNear(bpos, 1.0f, out bpos)) 
+1 `t                        { 
+1 `t                            if (Utils.TryGetGroundZ(bpos, out var bgz) && bgz > 0f) bpos = new Vector3(bpos.X, bpos.Y, bgz + 0.02f); 
+1 `t                        } 
+1 `t                        Bench = World.CreateProp(benchModel, bpos, true, false); 
+1 `t                        if (Bench != null && Bench.Exists()) 
+1 `t                        { 
+1 `t                            // Face the showcase  
+1 `t                            var d = ShowcasePos - Bench.Position; d.Z = 0f; 
+1 `t                            if (d.Length() > 0.001f) 
+1 `t                            { 
+1 `t                                float heading = (float)(System.Math.Atan2(d.Y, d.X) * 180.0 / System.Math.PI); 
+1 `t                                Bench.Heading = heading; 
+1 `t                            } 
+1 `t                            Function.Call(Hash.FREEZE_ENTITY_POSITION, Bench.Handle, true); 
+1 `t                        } 
+1 `t                    } 
+1 `t                } 
+1 `t 
+1 `t                // Extra benches 
+1 `t                if (Utils.SpawnBench) 
+1 `t                { 
+1 `t                    var benchModel = new Model("prop_bench_01a"); benchModel.Request(500); 
+1 `t                    if (benchModel.IsInCdImage && benchModel.IsValid) 
+1 `t                    { 
+1 `t                        Vector3[] extraBenchOffsets = new Vector3[] { new Vector3(1.2f, -1.6f, 0f), new Vector3(0.0f, -2.2f, 0f) }; 
+1 `t                        int need = Math.Max(0, Utils.BenchCount - 1); 
+1 `t                        for (int i = ExtraBenches.Count; i < Math.Min(need, extraBenchOffsets.Length); i++) 
+1 `t                        { 
+1 `t                            var pos = Main._shopPos + extraBenchOffsets[i]; 
+1 `t                            if (!Utils.TryFindSafeCoordNear(pos, 1.0f, out pos)) { if (Utils.TryGetGroundZ(pos, out var gz) && gz > 0f) pos = new Vector3(pos.X, pos.Y, gz + 0.02f); } 
+1 `t                            var b = World.CreateProp(benchModel, pos, true, false); 
+1 `t                            if (b != null && b.Exists()) 
+1 `t                            { 
+1 `t                                var d = ShowcasePos - b.Position; d.Z = 0f; 
+1 `t                                if (d.Length() > 0.001f) 
+1 `t                                { 
+1 `t                                    float heading = (float)(System.Math.Atan2(d.Y, d.X) * 180.0 / System.Math.PI); 
+1 `t                                    b.Heading = heading; 
+1 `t                                } 
+1 `t                                Function.Call(Hash.FREEZE_ENTITY_POSITION, b.Handle, true); 
+1 `t                                ExtraBenches.Add(b); 
+1 `t                            } 
+1 `t                        } 
+1 `t                    } 
+1 `t                } 
+1 `t 
+1 `t                // One customer looking at the showcase (primary) 
+1 `t                if (Utils.SpawnCustomer && (Customer == null || !Customer.Exists())) 
+1 `t                { 
+1 `t                    var cmodel = new Model("a_f_y_business_01"); 
+1 `t                    cmodel.Request(500); 
+1 `t                    if (cmodel.IsInCdImage && cmodel.IsValid) 
+1 `t                    { 
+1 `t                        var cpos = ShowcasePos + new Vector3(-0.8f, -0.9f, 0.0f); 
+1 `t                        if (!Utils.TryFindSafeCoordNear(cpos, 1.0f, out cpos)) 
+1 `t                        { 
+1 `t                            if (Utils.TryGetGroundZ(cpos, out var cgz) && cgz > 0f) cpos = new Vector3(cpos.X, cpos.Y, cgz + 0.02f); 
+1 `t                        } 
+1 `t                        Customer = World.CreatePed(cmodel, cpos); 
+1 `t                        if (Customer != null && Customer.Exists()) 
+1 `t                        { 
+1 `t                            var look = ShowcasePos; 
+1 `t                            var dir = look - Customer.Position; dir.Z = 0f; 
+1 `t                            if (dir.Length() > 0.001f) 
+1 `t                            { 
+1 `t                                float heading = (float)(System.Math.Atan2(dir.Y, dir.X) * 180.0 / System.Math.PI); 
+1 `t                                Customer.Heading = heading; 
+1 `t                            } 
+1 `t                            Customer.IsPersistent = true; 
+1 `t                            Function.Call(Hash.SET_BLOCKING_OF_NON_TEMPORARY_EVENTS, Customer.Handle, true); 
+1 `t                            Function.Call(Hash.TASK_START_SCENARIO_IN_PLACE, Customer.Handle, "WORLD_HUMAN_STAND_IMPATIENT", 0, true); 
+1 `t                        } 
+1 `t                    } 
+1 `t                } 
+1 `t 
+1 `t                // Extra customers 
+1 `t                if (Utils.SpawnCustomer) 
+1 `t                { 
+1 `t                    string[] models = new[] { "a_m_y_business_01", "a_f_y_hipster_01", "a_m_y_skater_01" }; 
+1 `t                    Vector3[] offsets = new[] { new Vector3(0.9f, -1.0f, 0f), new Vector3(0.0f, -1.8f, 0f), new Vector3(1.6f, -0.6f, 0f) }; 
+1 `t                    int need = Math.Max(0, Utils.CustomerCount - 1); 
+1 `t                    for (int i = ExtraCustomers.Count; i < Math.Min(need, offsets.Length); i++) 
+1 `t                    { 
+1 `t                        var mdl = new Model(models[i % models.Length]); mdl.Request(500); 
+1 `t                        if (!mdl.IsInCdImage || !mdl.IsValid) break; 
+1 `t                        var pos = ShowcasePos + offsets[i]; 
+1 `t                        if (!Utils.TryFindSafeCoordNear(pos, 1.0f, out pos)) { if (Utils.TryGetGroundZ(pos, out var gz) && gz > 0f) pos = new Vector3(pos.X, pos.Y, gz + 0.02f); } 
+1 `t                        var ped = World.CreatePed(mdl, pos); 
+1 `t                        if (ped != null && ped.Exists()) 
+1 `t                        { 
+1 `t                            var dir = ShowcasePos - ped.Position; dir.Z = 0f; if (dir.Length() > 0.001f) { float heading = (float)(System.Math.Atan2(dir.Y, dir.X) * 180.0 / System.Math.PI); ped.Heading = heading; } 
+1 `t                            ped.IsPersistent = true; Function.Call(Hash.SET_BLOCKING_OF_NON_TEMPORARY_EVENTS, ped.Handle, true); 
+1 `t                            string[] scenarios = new[] { "WORLD_HUMAN_STAND_MOBILE", "WORLD_HUMAN_STAND_IMPATIENT", "WORLD_HUMAN_AA_SMOKE" }; 
+1 `t                            Function.Call(Hash.TASK_START_SCENARIO_IN_PLACE, ped.Handle, scenarios[i % scenarios.Length], 0, true); 
+1 `t                            ExtraCustomers.Add(ped); 
+1 `t                        } 
+1 `t                    } 
+1 `t                } 
+1 `t 
+1 `t                // Simple decor 
+1 `t                if (Utils.SpawnDecor && DecorProps.Count == 0) 
+1 `t                { 
+1 `t                    TrySpawnDecor("prop_table_03", ShowcasePos + new Vector3(2.0f, -1.6f, 0f)); 
+1 `t                    TrySpawnDecor("prop_plant_int_01a", ShowcasePos + new Vector3(-2.0f, -1.6f, 0f)); 
+1 `t                } 
+1 `t            } 
+1 `t            catch { } 
+1 `t        } 
+1 `t 
+1 `t        private static void TrySpawnDecor(string modelName, Vector3 pos) 
+1 `t        { 
+1 `t            try 
+1 `t            { 
+1 `t                var m = new Model(modelName); m.Request(500); 
+1 `t                if (!m.IsInCdImage || !m.IsValid) return; 
+1 `t                if (!Utils.TryFindSafeCoordNear(pos, 1.0f, out pos)) 
+1 `t                { 
+1 `t                    if (Utils.TryGetGroundZ(pos, out var gz) && gz > 0f) pos = new Vector3(pos.X, pos.Y, gz + 0.02f); 
+1 `t                } 
+1 `t                var p = World.CreateProp(m, pos, true, false); 
+1 `t                if (p != null && p.Exists()) 
+1 `t                { 
+1 `t                    Function.Call(Hash.FREEZE_ENTITY_POSITION, p.Handle, true); 
+1 `t                    DecorProps.Add(p); 
+1 `t                } 
+1 `t            } 
+1 `t            catch { } 
+1 `t        } 
+1 `t 
+1 `t        private static void AdoptFromShowcase(int index) 
+1 `t        { 
+1 `t            if (Main.HasPet && Main.Pet != null && Main.Pet.Exists()) 
+1 `t            { 
+1 `t                Utils.Notify("~o~You already have a pet."); 
+1 `t                return; 
+1 `t            } 
+1 `t            if (ShowcaseAnimal == null || !ShowcaseAnimal.Exists()) return; 
+1 `t 
+1 `t            // Convert showcase ped into the adopted pet (prevents duplication) 
+1 `t            Main.Pet = ShowcaseAnimal; 
+1 `t            ShowcaseAnimal = null; 
+1 `t 
+1 `t            Main.PetName = Animals[index].Name; 
+1 `t            Main.HasPet = true; 
+1 `t 
+1 `t            // Prompt for a custom name 
+1 `t            try 
+1 `t            { 
+1 `t                string typed = Utils.GetUserTextInput("Enter Pet Name", Main.PetName, 20); 
+1 `t                if (!string.IsNullOrWhiteSpace(typed)) Main.PetName = typed.Trim(); 
+1 `t            } 
+1 `t            catch { } 
+1 `t 
+1 `t            try 
+1 `t            { 
+1 `t                int playerGroup = Function.Call<int>(Hash.GET_HASH_KEY, "PLAYER"); 
+1 `t                int petGroup = Function.Call<int>(Hash.GET_HASH_KEY, "PET_ANIMAL"); 
+1 `t                if (petGroup != 0) 
+1 `t                { 
+1 `t                    Function.Call(Hash.SET_RELATIONSHIP_BETWEEN_GROUPS, 0, playerGroup, petGroup); 
+1 `t                    Function.Call(Hash.SET_RELATIONSHIP_BETWEEN_GROUPS, 0, petGroup, playerGroup); 
+1 `t                    Function.Call(Hash.SET_PED_RELATIONSHIP_GROUP_HASH, Main.Pet.Handle, petGroup); 
+1 `t                } 
+1 `t                Function.Call(Hash.SET_BLOCKING_OF_NON_TEMPORARY_EVENTS, Main.Pet.Handle, true); 
+1 `t                Function.Call(Hash.SET_CAN_ATTACK_FRIENDLY, Main.Pet.Handle, false, false); 
+1 `t                Main.Pet.IsPersistent = true; 
+1 `t                Main.Pet.KeepTaskWhenMarkedAsNoLongerNeeded = true; 
+1 `t            } 
+1 `t            catch { } 
+1 `t 
+1 `t            // Optional showcase walk-off beat 
+1 `t            try 
+1 `t            { 
+1 `t                if (Utils.EnableWalkOffAnim && _shopCam != 0) 
+1 `t                { 
+1 `t                    var ahead = ShowcasePos + Game.Player.Character.ForwardVector * Utils.WalkOffDistance; 
+1 `t                    Function.Call(Hash.TASK_GO_STRAIGHT_TO_COORD, Main.Pet.Handle, ahead.X, ahead.Y, ahead.Z, 1.2f, 2500, 0f, 0f); 
+1 `t                    Script.Wait(350); 
+1 `t                } 
+1 `t            } 
+1 `t            catch { } 
+1 `t 
+1 `t            // Reposition near player safely 
+1 `t            var me = Game.Player.Character; 
+1 `t            if (!Utils.TryFindSafeCoordNear(me.Position, 6.0f, out var spawn)) 
+1 `t            { 
+1 `t                spawn = me.Position + me.ForwardVector * 1.2f; 
+1 `t                if (Utils.TryGetGroundZ(spawn, out var gz) && gz > 0f) spawn = new Vector3(spawn.X, spawn.Y, gz + 0.1f); 
+1 `t            } 
+1 `t            Main.Pet.Position = spawn; 
+1 `t            Main.Pet.Heading = me.Heading; 
+1 `t 
+1 `t            // Blip 
+1 `t            try 
+1 `t            { 
+1 `t                if (Main.PetBlip != null && Main.PetBlip.Exists()) Main.PetBlip.Delete(); 
+1 `t                Main.PetBlip = Main.Pet.AddBlip(); 
+1 `t                Main.PetBlip.Color = BlipColor.Yellow; 
+1 `t                Main.PetBlip.Name = Main.PetName; 
+1 `t            } 
+1 `t            catch { } 
+1 `t 
+1 `t            // HUD 
+1 `t            Hud.Show(Main.PetName); 
+1 `t 
+1 `t            ShopMenu.Visible = false; 
+1 `t            Main.IsShopping = false; 
+1 `t            CleanupCamera(); 
+1 `t 
+1 `t            // Auto-follow 
+1 `t            try 
+1 `t            { 
+1 `t                Function.Call(Hash.SET_PED_AS_GROUP_MEMBER, Main.Pet.Handle, Function.Call<int>(Hash.GET_PLAYER_GROUP, Function.Call<int>(Hash.PLAYER_ID))); 
+1 `t                Function.Call(Hash.SET_PED_NEVER_LEAVES_GROUP, Main.Pet.Handle, true); 
+1 `t                Function.Call(Hash.TASK_FOLLOW_TO_OFFSET_OF_ENTITY, Main.Pet.Handle, me.Handle, 0.0f, -1.2f, 0.0f, 2.2f, -1, 2.0f, true); 
+1 `t                try { PetInteractionMenu.SetFollowState(true); } catch { } 
+1 `t            } 
+1 `t            catch { } 
+1 `t 
+1 `t            Utils.Notify($"~g~Adopted {Main.PetName}~s~."); 
+1 `t        } 
+1 `t    } 
+1 `t} 
