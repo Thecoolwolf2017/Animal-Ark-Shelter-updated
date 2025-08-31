@@ -52,11 +52,11 @@ namespace AnimalArkShelter
                 SceneAnchor = new Vector3(sx, sy, sz);
 
                 // Scene dressing toggles and counts
-                SpawnBench = ini.GetValue("Shop", "SpawnBench", true);
-                SpawnCustomer = ini.GetValue("Shop", "SpawnCustomer", true);
-                SpawnDecor = ini.GetValue("Shop", "SpawnDecor", true);
-                BenchCount = Math.Max(0, ini.GetValue("Shop", "BenchCount", 2));
-                CustomerCount = Math.Max(0, ini.GetValue("Shop", "CustomerCount", 2));
+                SpawnBench = ini.GetValue("Shop", "SpawnBench", false);
+                SpawnCustomer = ini.GetValue("Shop", "SpawnCustomer", false);
+                SpawnDecor = ini.GetValue("Shop", "SpawnDecor", false);
+                BenchCount = Math.Max(0, ini.GetValue("Shop", "BenchCount", 0));
+                CustomerCount = Math.Max(0, ini.GetValue("Shop", "CustomerCount", 0));
 
                 ComeWarpIfFar = ini.GetValue("ComeHere", "WarpIfFar", true);
                 ComeWarpDistance = ini.GetValue("ComeHere", "WarpDistance", 120.0f);

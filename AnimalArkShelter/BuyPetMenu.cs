@@ -103,8 +103,7 @@ namespace AnimalArkShelter
                 _lastIndexShown = 0;
             }
 
-            EnsureShopkeeper();
-            EnsureShelterScene();
+            EnsureShopkeeper(); 
 
             SetupShopCamera();
             ShopMenu.Visible = true;
@@ -173,8 +172,7 @@ namespace AnimalArkShelter
                     _lastIndexShown = idx;
                 }
 
-                if (Shopkeeper == null || !Shopkeeper.Exists()) EnsureShopkeeper();
-                if ((Customer == null || !Customer.Exists() || Bench == null || !Bench.Exists())) EnsureShelterScene();
+                if (Shopkeeper == null || !Shopkeeper.Exists()) EnsureShopkeeper(); 
             }
             else
             {
@@ -227,18 +225,9 @@ namespace AnimalArkShelter
                     Function.Call(Hash.SET_CAM_COORD, _shopCam, camPos.X, camPos.Y, camPos.Z);
                     Function.Call(Hash.SET_CAM_ROT, _shopCam, 0.0f, 0.0f, 0.0f, 2);
                     Function.Call(Hash.SET_CAM_FOV, _shopCam, Utils.ShopFov);
-                    // Aim between showcase and bench if present to frame the whole scene
-                    var look = ShowcasePos;
-                    try
-                    {
-                        if (Bench != null && Bench.Exists())
-                        {
-                            var mid = (Bench.Position + ShowcasePos) * 0.5f;
-                            look = mid;
-                        }
-                    }
-                    catch { }
-                    Function.Call(Hash.POINT_CAM_AT_COORD, _shopCam, look.X, look.Y, look.Z + 0.5f);
+                    // Aim at the showcase animal (or its planned position) 
+                    var look = (ShowcaseAnimal != null && ShowcaseAnimal.Exists()) ? ShowcaseAnimal.Position : ShowcasePos; 
+                    Function.Call(Hash.POINT_CAM_AT_COORD, _shopCam, look.X, look.Y, look.Z + 0.4f); 
                     Function.Call(Hash.SET_CAM_ACTIVE, _shopCam, true);
                     Function.Call(Hash.RENDER_SCRIPT_CAMS, true, true, Utils.ShopEaseTimeMs, true, false, 0);
                 }
