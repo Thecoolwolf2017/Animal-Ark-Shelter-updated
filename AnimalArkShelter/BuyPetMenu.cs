@@ -11,6 +11,8 @@ namespace AnimalArkShelter
         public static NativeMenu ShopMenu;
         public static Ped ShowcaseAnimal;
         public static Ped Shopkeeper;
+        public static Ped Customer;
+        public static Prop Bench;
 
         // Native camera (robust across SHVDN3 nightlies)
         private static int _shopCam = 0;
@@ -95,6 +97,7 @@ namespace AnimalArkShelter
             }
 
             EnsureShopkeeper();
+            EnsureShelterScene();
 
             SetupShopCamera();
             ShopMenu.Visible = true;
@@ -164,6 +167,7 @@ namespace AnimalArkShelter
                 }
 
                 if (Shopkeeper == null || !Shopkeeper.Exists()) EnsureShopkeeper();
+                if (Customer == null || !Customer.Exists() || Bench == null || !Bench.Exists()) EnsureShelterScene();
             }
             else
             {
@@ -176,9 +180,19 @@ namespace AnimalArkShelter
                         Shopkeeper.MarkAsNoLongerNeeded();
                         Shopkeeper.Delete();
                     }
+                    if (Customer != null && Customer.Exists())
+                    {
+                        Customer.MarkAsNoLongerNeeded();
+                        Customer.Delete();
+                    }
+                    if (Bench != null && Bench.Exists())
+                    {
+                        Bench.MarkAsNoLongerNeeded();
+                        Bench.Delete();
+                    }
                 }
                 catch { }
-                Shopkeeper = null;
+                Shopkeeper = null; Customer = null; Bench = null;
             }
         }
 
@@ -276,6 +290,69 @@ namespace AnimalArkShelter
                     Shopkeeper.IsPersistent = true;
                     Function.Call(Hash.SET_BLOCKING_OF_NON_TEMPORARY_EVENTS, Shopkeeper.Handle, true);
                     Function.Call(Hash.TASK_START_SCENARIO_IN_PLACE, Shopkeeper.Handle, "WORLD_HUMAN_STAND_IMPATIENT", 0, true);
+                }
+            }
+            catch { }
+        }
+
+        private static void EnsureShelterScene()
+        {
+            try
+            {
+                // Simple bench for waiting area
+                if (Bench == null || !Bench.Exists())
+                {
+                    var benchModel = new Model("prop_bench_01a");
+                    benchModel.Request(500);
+                    if (benchModel.IsInCdImage && benchModel.IsValid)
+                    {
+                        var bpos = Main._shopPos + new Vector3(-1.2f, -1.6f, 0.0f);
+                        if (!Utils.TryFindSafeCoordNear(bpos, 1.0f, out bpos))
+                        {
+                            if (Utils.TryGetGroundZ(bpos, out var bgz) && bgz > 0f) bpos = new Vector3(bpos.X, bpos.Y, bgz + 0.02f);
+                        }
+                        Bench = World.CreateProp(benchModel, bpos, true, false);
+                        if (Bench != null && Bench.Exists())
+                        {
+                            // Face the showcase
+                            var d = ShowcasePos - Bench.Position; d.Z = 0f;
+                            if (d.Length() > 0.001f)
+                            {
+                                float heading = (float)(System.Math.Atan2(d.Y, d.X) * 180.0 / System.Math.PI);
+                                Bench.Heading = heading;
+                            }
+                            Function.Call(Hash.FREEZE_ENTITY_POSITION, Bench.Handle, true);
+                        }
+                    }
+                }
+
+                // One customer looking at the showcase
+                if (Customer == null || !Customer.Exists())
+                {
+                    var cmodel = new Model("a_f_y_business_01");
+                    cmodel.Request(500);
+                    if (cmodel.IsInCdImage && cmodel.IsValid)
+                    {
+                        var cpos = ShowcasePos + new Vector3(-0.8f, -0.9f, 0.0f);
+                        if (!Utils.TryFindSafeCoordNear(cpos, 1.0f, out cpos))
+                        {
+                            if (Utils.TryGetGroundZ(cpos, out var cgz) && cgz > 0f) cpos = new Vector3(cpos.X, cpos.Y, cgz + 0.02f);
+                        }
+                        Customer = World.CreatePed(cmodel, cpos);
+                        if (Customer != null && Customer.Exists())
+                        {
+                            var look = ShowcasePos;
+                            var dir = look - Customer.Position; dir.Z = 0f;
+                            if (dir.Length() > 0.001f)
+                            {
+                                float heading = (float)(System.Math.Atan2(dir.Y, dir.X) * 180.0 / System.Math.PI);
+                                Customer.Heading = heading;
+                            }
+                            Customer.IsPersistent = true;
+                            Function.Call(Hash.SET_BLOCKING_OF_NON_TEMPORARY_EVENTS, Customer.Handle, true);
+                            Function.Call(Hash.TASK_START_SCENARIO_IN_PLACE, Customer.Handle, "WORLD_HUMAN_STAND_IMPATIENT", 0, true);
+                        }
+                    }
                 }
             }
             catch { }

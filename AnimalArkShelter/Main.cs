@@ -16,15 +16,15 @@ namespace AnimalArkShelter
             {
                 _iniFile = ScriptSettings.Load(@"scripts\AnimalArkShelter.ini");
                 _petInteractionMenuKey = _iniFile.GetValue("Keys", "InteractionMenuKey", Keys.J);
-                float x = _iniFile.GetValue("Shop", "X", 562.555f);
-                float y = _iniFile.GetValue("Shop", "Y", 2741.580f);
-                float z = _iniFile.GetValue("Shop", "Z", 42.324f);
+                float x = _iniFile.GetValue("Shop", "X", 597.0833f);
+                float y = _iniFile.GetValue("Shop", "Y", 2800.7881f);
+                float z = _iniFile.GetValue("Shop", "Z", 41.3537f);
                 _shopPos = new Vector3(x, y, z);
             }
             catch
             {
                 _petInteractionMenuKey = Keys.J;
-                _shopPos = new Vector3(562.555f, 2741.580f, 42.324f);
+                _shopPos = new Vector3(597.0833f, 2800.7881f, 41.3537f);
             }
 
             ShopBlip = World.CreateBlip(_shopPos);
